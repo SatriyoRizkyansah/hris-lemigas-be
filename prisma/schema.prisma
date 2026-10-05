@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ─────────────────────────────────────────────────────────────────
+
+enum StatusAktif {
+  AKTIF
+  NONAKTIF
+}
+
+enum TipePegawai {
+  PNS
+  ASN
+  OUTSOURCING
+  TA
+}
+
+enum TipeUnit {
+  KOORDINATOR
+  SUB_KOORDINATOR
+}
+
+enum SumberDana {
+  RO
+  OPERASIONAL
+}
+
+enum StatusAlokasi {
+  AKTIF
+  DIBATALKAN
+}
+
+enum AksiAudit {
+  CREATE
+  UPDATE
+  DELETE
+  ACTIVATE
+  CANCEL
+}
+
+// ─── 1. AUTH / USER ────────────────────────────────────────────────────────
+
+model Role {
+  id        String  @id @default(uuid()) @db.Uuid
+  kode      String  @unique @db.VarChar(50)
+  nama      String  @db.VarChar(100)
+  deskripsi String? @db.Text
+
+  users User[]
+
+  @@map("role")
+}
+
+model User {
+  id            String      @id @default(uuid()) @db.Uuid
+  nama          String      @db.VarChar(150)
+  email         String      @unique @db.VarChar(150)
+  password_hash String      @db.VarChar(255)
+  foto          String?     @db.VarChar(500)
+  role_id       String      @db.Uuid
+  // Untuk user KOORDINATOR: unit kerja yang dipimpin
+  unit_kerja_id String?     @db.Uuid
+  pegawai_id    String?     @unique @db.Uuid
+  status        StatusAktif @default(AKTIF)
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+
+  role        Role       @relation(fields: [role_id], references: [id])
+  pegawai     Pegawai?   @relation(fields: [pegawai_id], references: [id])
+  unit_kerja  UnitKerja? @relation(fields: [unit_kerja_id], references: [id])
+
+  alokasi_dibuat AlokasiGajiTA[]
+  audit_log      AuditLog[]
+
+  @@index([role_id])
+  @@map("user")
+}
+
+// ─── 2. ORGANISASI ─────────────────────────────────────────────────────────
+
+model UnitKerja {
+  id              String      @id @default(uuid()) @db.Uuid
+  kode_unit       String      @unique @db.VarChar(30)
+  nama_unit       String      @db.VarChar(150)
+  tipe_unit       TipeUnit
+  parent_unit_id  String?     @db.Uuid
+  kepala_unit_id  String?     @db.Uuid
+  deskripsi       String?     @db.Text
+  status_aktif    StatusAktif @default(AKTIF)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  parent   UnitKerja?  @relation("UnitHierarki", fields: [parent_unit_id], references: [id])
+  children UnitKerja[] @relation("UnitHierarki")
+
+  kepala_unit Pegawai? @relation("KepalaUnit", fields: [kepala_unit_id], references: [id])
+
+  pegawai_list     Pegawai[]
+  sk_list          Sk[]
+  ro_list          Ro[]
+  dana_operasional DanaOperasional[]
+  user_koordinator User[]
+
+  @@index([parent_unit_id])
+  @@index([tipe_unit])
+  @@map("unit_kerja")
+}
+
+// ─── 3. PEGAWAI ────────────────────────────────────────────────────────────
+
+model Pegawai {
+  id            String      @id @default(uuid()) @db.Uuid
+  nip_nik       String      @unique @db.VarChar(32)
+  nama          String      @db.VarChar(150)
+  tipe_pegawai  TipePegawai
+  jabatan       String?     @db.VarChar(150)
+  email         String?     @unique @db.VarChar(150)
+  telepon       String?     @db.VarChar(30)
+  tanggal_mulai DateTime    @db.Date
+  status_aktif  StatusAktif @default(AKTIF)
+
+  // Khusus TA
+  bidang_keahlian String?   @db.VarChar(150)
+  kontrak_mulai   DateTime? @db.Date
+  kontrak_selesai DateTime? @db.Date
+  gaji_bulanan    Int       @default(0)
+
+  // Unit kerja aktif (dibuktikan SK aktif)
+  unit_kerja_id String?   @db.Uuid
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  unit_kerja  UnitKerja?  @relation(fields: [unit_kerja_id], references: [id])
+  kepala_dari UnitKerja[] @relation("KepalaUnit")
+
+  sk_list      Sk[]
+  alokasi_list AlokasiGajiTA[]
+  user_akun    User?
+
+  @@index([tipe_pegawai])
+  @@index([status_aktif])
+  @@index([unit_kerja_id])
+  @@map("pegawai")
+}
+
+// ─── 4. SK (SURAT KEPUTUSAN PENUGASAN) ─────────────────────────────────────
+
+model Sk {
+  id              String      @id @default(uuid()) @db.Uuid
+  nomor_sk        String      @unique @db.VarChar(100)
+  tanggal_sk      DateTime    @db.Date
+  tanggal_efektif DateTime    @db.Date
+  tanggal_selesai DateTime?   @db.Date
+  pegawai_id      String      @db.Uuid
+  unit_kerja_id   String      @db.Uuid
+  jabatan         String?     @db.VarChar(150)
+  file_sk         String?     @db.VarChar(500)
+  status_aktif    StatusAktif @default(AKTIF)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  pegawai    Pegawai   @relation(fields: [pegawai_id], references: [id])
+  unit_kerja UnitKerja @relation(fields: [unit_kerja_id], references: [id])
+
+  @@index([pegawai_id])
+  @@index([status_aktif])
+  @@map("sk")
+}
+
+// ─── 5. PROYEK & RO ────────────────────────────────────────────────────────
+
+model Proyek {
+  id               String   @id @default(uuid()) @db.Uuid
+  kode_proyek      String   @unique @db.VarChar(50)
+  nama_proyek      String   @db.VarChar(200)
+  tahun_fiscal     Int
+  sumber_pendanaan String?  @db.VarChar(150)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  ro_list Ro[]
+
+  @@index([tahun_fiscal])
+  @@map("proyek")
+}
+
+model Ro {
+  id                  String   @id @default(uuid()) @db.Uuid
+  kode_ro             String   @unique @db.VarChar(50)
+  nama_ro             String   @db.VarChar(200)
+  proyek_id           String   @db.Uuid
+  unit_koordinator_id String   @db.Uuid
+  tahun_fiscal        Int
+  total_plafon        Int      @default(0)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  proyek           Proyek    @relation(fields: [proyek_id], references: [id])
+  unit_koordinator UnitKerja @relation(fields: [unit_koordinator_id], references: [id])
+
+  alokasi_list AlokasiGajiTA[]
+
+  @@index([proyek_id])
+  @@index([unit_koordinator_id])
+  @@index([tahun_fiscal])
+  @@map("ro")
+}
+
+// ─── 6. DANA OPERASIONAL KOORDINATOR ───────────────────────────────────────
+
+model DanaOperasional {
+  id                  String   @id @default(uuid()) @db.Uuid
+  unit_koordinator_id String   @db.Uuid
+  tahun_fiscal        Int
+  total_plafon        Int      @default(0)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  unit_koordinator UnitKerja @relation(fields: [unit_koordinator_id], references: [id])
+
+  alokasi_list AlokasiGajiTA[]
+
+  @@unique([unit_koordinator_id, tahun_fiscal])
+  @@map("dana_operasional")
+}
+
+// ─── 7. ALOKASI GAJI TA ────────────────────────────────────────────────────
+
+model AlokasiGajiTA {
+  id                  String        @id @default(uuid()) @db.Uuid
+  pegawai_id          String        @db.Uuid
+  periode_bulan       Int
+  periode_tahun       Int
+  sumber_dana         SumberDana
+  ro_id               String?       @db.Uuid
+  dana_operasional_id String?       @db.Uuid
+  jumlah              Int
+  status              StatusAlokasi @default(AKTIF)
+  keterangan          String?       @db.VarChar(255)
+  dibuat_oleh         String        @db.Uuid
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
+
+  pegawai          Pegawai          @relation(fields: [pegawai_id], references: [id])
+  ro               Ro?              @relation(fields: [ro_id], references: [id])
+  dana_operasional DanaOperasional? @relation(fields: [dana_operasional_id], references: [id])
+  pembuat          User             @relation(fields: [dibuat_oleh], references: [id])
+
+  @@index([pegawai_id])
+  @@index([periode_bulan, periode_tahun])
+  @@index([ro_id])
+  @@index([dana_operasional_id])
+  @@map("alokasi_gaji_ta")
+}
+
+// ─── 8. AUDIT TRAIL ────────────────────────────────────────────────────────
+
+model AuditLog {
+  id             String     @id @default(uuid()) @db.Uuid
+  tabel          String     @db.VarChar(50)
+  record_id      String     @db.Uuid
+  aksi           AksiAudit
+  dilakukan_oleh String     @db.Uuid
+  data_sebelum   Json?
+  data_sesudah   Json?
+  created_at     DateTime   @default(now())
+
+  pembuat User @relation(fields: [dilakukan_oleh], references: [id])
+
+  @@index([tabel, record_id])
+  @@map("audit_log")
+}
