@@ -27,12 +27,12 @@ export class FileController {
     const joined = Array.isArray(rawPath)
       ? rawPath.join('/')
       : String(rawPath ?? '');
-    // normalize and strip leading uploads/ if present (DB stores uploads/dokumen/...)
+    // DB stores uploads/dokumen/..., route may receive uploads/... or dokumen/...
     let safePath = normalize(joined).replace(/^(\.\.(\/|\\|$))+/, '');
-    // remove leading slash
-    safePath = safePath.replace(/^\/+/, '');
-    if (safePath.startsWith('uploads/'))
+    safePath = safePath.replace(/^[/\\]+/, '').replace(/\\/g, '/');
+    if (safePath.startsWith('uploads/')) {
       safePath = safePath.slice('uploads/'.length);
+    }
     const filePath = join(process.cwd(), 'uploads', safePath);
     if (!existsSync(filePath)) {
       throw new NotFoundException('File tidak ditemukan');
