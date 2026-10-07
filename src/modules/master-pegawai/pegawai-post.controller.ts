@@ -62,7 +62,10 @@ export class PegawaiPostController {
         tanggal_mulai: new Date(body.tanggal_mulai),
         status_aktif: body.status_aktif ?? 'AKTIF',
         bidang_keahlian: body.bidang_keahlian ?? null,
-        kontrak_mulai: body.kontrak_mulai ? new Date(body.kontrak_mulai) : null,
+        kontrak_mulai:
+          body.tipe_pegawai === 'TA'
+            ? new Date(body.kontrak_mulai ?? body.tanggal_mulai)
+            : null,
         kontrak_selesai: body.kontrak_selesai
           ? new Date(body.kontrak_selesai)
           : null,

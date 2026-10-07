@@ -61,31 +61,68 @@ export class SkPutController {
       if (!unit) throw new BadRequestException('Unit kerja tidak ditemukan');
     }
 
-    const sk = await this.prisma.sk.update({
-      where: { id },
-      data: {
-        ...(body.nomor_sk !== undefined && { nomor_sk: body.nomor_sk }),
-        ...(body.tanggal_sk !== undefined && {
-          tanggal_sk: new Date(body.tanggal_sk),
-        }),
-        ...(body.tanggal_efektif !== undefined && {
-          tanggal_efektif: new Date(body.tanggal_efektif),
-        }),
-        ...(body.tanggal_selesai !== undefined && {
-          tanggal_selesai: body.tanggal_selesai
-            ? new Date(body.tanggal_selesai)
-            : null,
-        }),
-        ...(body.id_unit_kerja !== undefined && {
-          unit_kerja_id: body.id_unit_kerja,
-        }),
-        ...(body.jabatan !== undefined && { jabatan: body.jabatan }),
-        ...(body.file_sk !== undefined && { file_sk: body.file_sk }),
-      },
-      include: {
-        pegawai: { select: { id: true, nama: true, nip_nik: true } },
-        unit_kerja: { select: { id: true, nama_unit: true } },
-      },
+    const sk = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.sk.update({
+        where: { id },
+        data: {
+          ...(body.nomor_sk !== undefined && { nomor_sk: body.nomor_sk }),
+          ...(body.tanggal_sk !== undefined && {
+            tanggal_sk: new Date(body.tanggal_sk),
+          }),
+          ...(body.tanggal_efektif !== undefined && {
+            tanggal_efektif: new Date(body.tanggal_efektif),
+          }),
+          ...(body.tanggal_selesai !== undefined && {
+            tanggal_selesai: body.tanggal_selesai
+              ? new Date(body.tanggal_selesai)
+              : null,
+          }),
+          ...(body.id_unit_kerja !== undefined && {
+            unit_kerja_id: body.id_unit_kerja,
+          }),
+          ...(body.jabatan !== undefined && { jabatan: body.jabatan }),
+          ...(body.file_sk !== undefined && { file_sk: body.file_sk }),
+        },
+        include: {
+          pegawai: { select: { id: true, nama: true, nip_nik: true } },
+          unit_kerja: { select: { id: true, nama_unit: true } },
+        },
+      });
+
+      if (updated.status_aktif === 'AKTIF') {
+        await tx.penempatanPegawai.updateMany({
+          where: {
+            pegawai_id: updated.pegawai_id,
+            no_sk: existing.nomor_sk,
+            is_homebase: true,
+            status_aktif: 'AKTIF',
+          },
+          data: {
+            unit_kerja_id: updated.unit_kerja_id,
+            jabatan: updated.jabatan,
+            tmt: updated.tanggal_efektif,
+            no_sk: updated.nomor_sk,
+            file_sk: updated.file_sk,
+          },
+        });
+        const pegawaiPatch: any = {};
+        if (body.jabatan !== undefined) pegawaiPatch.jabatan = updated.jabatan;
+        // Kontrak mengikuti periode SK aktif
+        if (
+          body.tanggal_efektif !== undefined ||
+          body.tanggal_selesai !== undefined
+        ) {
+          pegawaiPatch.kontrak_mulai = updated.tanggal_efektif;
+          pegawaiPatch.kontrak_selesai = updated.tanggal_selesai ?? null;
+        }
+        if (Object.keys(pegawaiPatch).length) {
+          await tx.pegawai.update({
+            where: { id: updated.pegawai_id },
+            data: pegawaiPatch,
+          });
+        }
+      }
+      return updated;
     });
 
     await this.audit.log({
@@ -116,6 +153,9 @@ export class SkPutController {
       },
     });
     if (!sk) throw new NotFoundException('SK tidak ditemukan');
+    if ((sk.status_aktif === 'AKTIF') === body.status) {
+      return ok('Status SK tidak berubah', this.mapItem(sk));
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       if (body.status) {
@@ -164,12 +204,14 @@ export class SkPutController {
             keterangan: 'Homebase',
           },
         });
-        if (sk.jabatan) {
-          await tx.pegawai.update({
-            where: { id: sk.pegawai_id },
-            data: { jabatan: sk.jabatan },
-          });
-        }
+        const pegawaiPatch2: any = {};
+        if (sk.jabatan) pegawaiPatch2.jabatan = sk.jabatan;
+        pegawaiPatch2.kontrak_mulai = sk.tanggal_efektif;
+        pegawaiPatch2.kontrak_selesai = sk.tanggal_selesai ?? null;
+        await tx.pegawai.update({
+          where: { id: sk.pegawai_id },
+          data: pegawaiPatch2,
+        });
 
         return updated;
       }

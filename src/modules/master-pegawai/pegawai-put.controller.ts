@@ -89,7 +89,13 @@ export class PegawaiPutController {
     });
 
     if (body.id_unit_kerja !== undefined) {
-      if (body.id_unit_kerja) {
+      const homebase = await this.prisma.penempatanPegawai.findFirst({
+        where: { pegawai_id: id, is_homebase: true, status_aktif: 'AKTIF' },
+      });
+      if (
+        body.id_unit_kerja &&
+        body.id_unit_kerja !== homebase?.unit_kerja_id
+      ) {
         await this.prisma.penempatanPegawai.updateMany({
           where: { pegawai_id: id, is_homebase: true, status_aktif: 'AKTIF' },
           data: {
@@ -109,7 +115,7 @@ export class PegawaiPutController {
             keterangan: 'Homebase',
           },
         });
-      } else {
+      } else if (!body.id_unit_kerja && homebase) {
         await this.prisma.penempatanPegawai.updateMany({
           where: { pegawai_id: id, is_homebase: true },
           data: {
