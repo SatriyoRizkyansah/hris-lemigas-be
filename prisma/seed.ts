@@ -425,7 +425,6 @@ async function main() {
         email: p.email,
         gaji_bulanan: p.gaji,
         bidang_keahlian: p.bidang ?? null,
-        unit_kerja_id: p.unitId,
       },
       create: {
         nip_nik: p.nip_nik,
@@ -434,7 +433,6 @@ async function main() {
         jabatan: p.jabatan,
         email: p.email,
         tanggal_mulai: new Date('2026-01-01'),
-        unit_kerja_id: p.unitId,
         gaji_bulanan: p.gaji,
         bidang_keahlian: p.bidang ?? null,
         ...(p.tipe === 'TA'
@@ -446,6 +444,33 @@ async function main() {
       },
     });
     pegawaiMap.set(p.nip_nik, existing.id);
+    // homebase penempatan
+    const existingPenempatan = await prisma.penempatanPegawai.findFirst({
+      where: {
+        pegawai_id: existing.id,
+        is_homebase: true,
+        status_aktif: 'AKTIF',
+      },
+    });
+    if (!existingPenempatan) {
+      await prisma.penempatanPegawai.create({
+        data: {
+          pegawai_id: existing.id,
+          unit_kerja_id: p.unitId,
+          jabatan: p.jabatan,
+          tmt: new Date('2026-01-01'),
+          no_sk: `SK/${p.nip_nik}/2026`,
+          status_aktif: 'AKTIF',
+          is_homebase: true,
+          keterangan: 'Homebase',
+        },
+      });
+    } else if (existingPenempatan.unit_kerja_id !== p.unitId) {
+      await prisma.penempatanPegawai.update({
+        where: { id: existingPenempatan.id },
+        data: { unit_kerja_id: p.unitId, jabatan: p.jabatan },
+      });
+    }
   }
 
   // ─── SK Aktif (bukti unit kerja & jabatan) ─────────────────────────────
@@ -471,7 +496,7 @@ async function main() {
     }
     await prisma.pegawai.update({
       where: { id: pegawaiId },
-      data: { unit_kerja_id: p.unitId, jabatan: p.jabatan },
+      data: { jabatan: p.jabatan },
     });
   }
 

@@ -11,6 +11,17 @@ export enum TipePegawai {
   TA = 'TA',
 }
 
+export enum TaKategori {
+  BIASA = 'BIASA',
+  RO = 'RO',
+}
+
+export enum StatusRo {
+  AKTIF = 'AKTIF',
+  NONAKTIF = 'NONAKTIF',
+  SELESAI = 'SELESAI',
+}
+
 export enum TipeUnit {
   KOORDINATOR = 'KOORDINATOR',
   SUB_KOORDINATOR = 'SUB_KOORDINATOR',

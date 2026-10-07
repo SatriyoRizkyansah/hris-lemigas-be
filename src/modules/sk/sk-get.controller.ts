@@ -95,15 +95,23 @@ export class SkGetController {
   ) {
     const pegawai = await this.prisma.pegawai.findUnique({
       where: { id: pegawaiId },
+      include: {
+        penempatan_list: {
+          where: { is_homebase: true, status_aktif: 'AKTIF' },
+          select: { unit_kerja_id: true },
+          take: 1,
+        },
+      },
     });
     if (!pegawai) {
       return paginated('Pegawai tidak ditemukan', [], 1, query.limit, 0);
     }
 
     if (user.role === Role.Koordinator && user.unitKerjaId) {
-      if (pegawai.unit_kerja_id) {
+      const unitId = (pegawai as any).penempatan_list?.[0]?.unit_kerja_id;
+      if (unitId) {
         const inScope = await this.unitScope.isUnitInScope(
-          pegawai.unit_kerja_id,
+          unitId,
           user.unitKerjaId,
         );
         if (!inScope) {

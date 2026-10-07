@@ -69,11 +69,23 @@ export class AlokasiRekapController {
         tipe_pegawai: 'TA',
         status_aktif: 'AKTIF',
         ...(unitIds && unitIds.length > 0
-          ? { unit_kerja_id: { in: unitIds } }
+          ? {
+              penempatan_list: {
+                some: {
+                  unit_kerja_id: { in: unitIds },
+                  is_homebase: true,
+                  status_aktif: 'AKTIF',
+                },
+              },
+            }
           : {}),
       },
       include: {
-        unit_kerja: { select: { id: true, nama_unit: true } },
+        penempatan_list: {
+          where: { is_homebase: true, status_aktif: 'AKTIF' },
+          select: { unit_kerja: { select: { id: true, nama_unit: true } } },
+          take: 1,
+        },
         alokasi_list: {
           where: {
             periode_bulan,
@@ -86,32 +98,33 @@ export class AlokasiRekapController {
           },
         },
       },
-      orderBy: [{ unit_kerja: { nama_unit: 'asc' } }, { nama: 'asc' }],
+      orderBy: { nama: 'asc' },
     });
 
-    const data: RekapItemDto[] = pegawais.map((pegawai) => {
+    const data: RekapItemDto[] = pegawais.map((pegawai: any) => {
       const total_alokasi = pegawai.alokasi_list.reduce(
-        (acc, a) => acc + a.jumlah,
+        (acc: number, a: any) => acc + a.jumlah,
         0,
       );
       const alokasi_ro = pegawai.alokasi_list
-        .filter((a) => a.sumber_dana === 'RO')
-        .reduce((acc, a) => acc + a.jumlah, 0);
+        .filter((a: any) => a.sumber_dana === 'RO')
+        .reduce((acc: number, a: any) => acc + a.jumlah, 0);
       const alokasi_operasional = pegawai.alokasi_list
-        .filter((a) => a.sumber_dana === 'OPERASIONAL')
-        .reduce((acc, a) => acc + a.jumlah, 0);
+        .filter((a: any) => a.sumber_dana === 'OPERASIONAL')
+        .reduce((acc: number, a: any) => acc + a.jumlah, 0);
+      const uk = pegawai.penempatan_list?.[0]?.unit_kerja ?? null;
 
       return {
         id_pegawai: pegawai.id,
         nama_pegawai: pegawai.nama,
         nip_nik: pegawai.nip_nik,
-        nama_unit_kerja: pegawai.unit_kerja?.nama_unit ?? null,
+        nama_unit_kerja: uk?.nama_unit ?? null,
         gaji_bulanan: pegawai.gaji_bulanan,
         total_alokasi,
         alokasi_ro,
         alokasi_operasional,
         sisa_gaji: pegawai.gaji_bulanan - total_alokasi,
-        detail: pegawai.alokasi_list.map((a) => ({
+        detail: pegawai.alokasi_list.map((a: any) => ({
           id: a.id,
           periode_bulan: a.periode_bulan,
           periode_tahun: a.periode_tahun,
@@ -122,8 +135,8 @@ export class AlokasiRekapController {
           id_pegawai: pegawai.id,
           nama_pegawai: pegawai.nama,
           nip_nik: pegawai.nip_nik,
-          id_unit_kerja: pegawai.unit_kerja?.id ?? null,
-          nama_unit_kerja: pegawai.unit_kerja?.nama_unit ?? null,
+          id_unit_kerja: uk?.id ?? null,
+          nama_unit_kerja: uk?.nama_unit ?? null,
           id_ro: a.ro?.id ?? null,
           nama_ro: a.ro ? `${a.ro.kode_ro} - ${a.ro.nama_ro}` : null,
           id_dana_operasional: a.dana_operasional?.id ?? null,
@@ -155,11 +168,23 @@ export class AlokasiRekapController {
         tipe_pegawai: 'TA',
         status_aktif: 'AKTIF',
         ...(unitIds && unitIds.length > 0
-          ? { unit_kerja_id: { in: unitIds } }
+          ? {
+              penempatan_list: {
+                some: {
+                  unit_kerja_id: { in: unitIds },
+                  is_homebase: true,
+                  status_aktif: 'AKTIF',
+                },
+              },
+            }
           : {}),
       },
       include: {
-        unit_kerja: { select: { nama_unit: true } },
+        penempatan_list: {
+          where: { is_homebase: true, status_aktif: 'AKTIF' },
+          select: { unit_kerja: { select: { nama_unit: true } } },
+          take: 1,
+        },
         alokasi_list: {
           where: { periode_bulan, periode_tahun, status: 'AKTIF' },
           include: {
@@ -167,7 +192,7 @@ export class AlokasiRekapController {
           },
         },
       },
-      orderBy: [{ unit_kerja: { nama_unit: 'asc' } }, { nama: 'asc' }],
+      orderBy: { nama: 'asc' },
     });
 
     const ExcelJS = (await import('exceljs')).default;
@@ -239,7 +264,8 @@ export class AlokasiRekapController {
         no: no++,
         nip_nik: pegawai.nip_nik,
         nama: pegawai.nama,
-        unit: pegawai.unit_kerja?.nama_unit ?? '-',
+        unit:
+          (pegawai as any).penempatan_list?.[0]?.unit_kerja?.nama_unit ?? '-',
         gaji: pegawai.gaji_bulanan,
         alokasi_ro,
         alokasi_operasional,

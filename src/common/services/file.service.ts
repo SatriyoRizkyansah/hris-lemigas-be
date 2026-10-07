@@ -29,6 +29,21 @@ export class FileService {
     return `${uploadDir}/${filename}`;
   }
 
+  async uploadRab(file?: UploadedFileLike): Promise<string> {
+    if (!file) throw new BadRequestException('File RAB tidak ditemukan');
+    const ext = extname(file.originalname).toLowerCase();
+    const allowed = ['.pdf', '.xlsx', '.xls'];
+    if (!allowed.includes(ext))
+      throw new BadRequestException('File RAB harus PDF atau Excel');
+    if (file.buffer.length > 10 * 1024 * 1024)
+      throw new BadRequestException('File RAB maksimal 10MB');
+    const filename = `${randomUUID()}${ext}`;
+    const uploadDir = `uploads/dokumen/rab`;
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.writeFile(`${uploadDir}/${filename}`, file.buffer);
+    return `${uploadDir}/${filename}`;
+  }
+
   async delete(path?: string | null): Promise<void> {
     if (!path) return;
     try {

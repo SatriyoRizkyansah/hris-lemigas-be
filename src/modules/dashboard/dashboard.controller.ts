@@ -96,7 +96,13 @@ export class DashboardController {
         where: {
           tipe_pegawai: 'TA',
           status_aktif: 'AKTIF',
-          unit_kerja_id: { in: scopedUnits },
+          penempatan_list: {
+            some: {
+              unit_kerja_id: { in: scopedUnits },
+              is_homebase: true,
+              status_aktif: 'AKTIF',
+            },
+          },
         },
       });
       taPerKoordinator.push({
@@ -205,14 +211,26 @@ export class DashboardController {
       this.prisma.pegawai.count({
         where: {
           status_aktif: 'AKTIF',
-          unit_kerja_id: { in: scopedUnits },
+          penempatan_list: {
+            some: {
+              unit_kerja_id: { in: scopedUnits },
+              is_homebase: true,
+              status_aktif: 'AKTIF',
+            },
+          },
         },
       }),
       this.prisma.pegawai.count({
         where: {
           tipe_pegawai: 'TA',
           status_aktif: 'AKTIF',
-          unit_kerja_id: { in: scopedUnits },
+          penempatan_list: {
+            some: {
+              unit_kerja_id: { in: scopedUnits },
+              is_homebase: true,
+              status_aktif: 'AKTIF',
+            },
+          },
         },
       }),
       this.prisma.unitKerja.count({
@@ -276,7 +294,15 @@ export class DashboardController {
         status: 'AKTIF',
         periode_bulan: now.getMonth() + 1,
         periode_tahun: now.getFullYear(),
-        pegawai: { unit_kerja_id: { in: scopedUnits } },
+        pegawai: {
+          penempatan_list: {
+            some: {
+              unit_kerja_id: { in: scopedUnits },
+              is_homebase: true,
+              status_aktif: 'AKTIF',
+            },
+          },
+        },
       },
     });
 

@@ -138,14 +138,38 @@ export class SkPutController {
           },
         });
 
-        // Sinkronkan unit kerja & jabatan pegawai
-        await tx.pegawai.update({
-          where: { id: sk.pegawai_id },
+        // Sinkronkan penempatan homebase & jabatan pegawai
+        await tx.penempatanPegawai.updateMany({
+          where: {
+            pegawai_id: sk.pegawai_id,
+            is_homebase: true,
+            status_aktif: 'AKTIF',
+          },
           data: {
-            unit_kerja_id: sk.unit_kerja_id,
-            jabatan: sk.jabatan ?? undefined,
+            is_homebase: false,
+            status_aktif: 'NONAKTIF',
+            tanggal_selesai: new Date(),
           },
         });
+        await tx.penempatanPegawai.create({
+          data: {
+            pegawai_id: sk.pegawai_id,
+            unit_kerja_id: sk.unit_kerja_id,
+            jabatan: sk.jabatan ?? null,
+            tmt: sk.tanggal_efektif,
+            no_sk: sk.nomor_sk,
+            file_sk: sk.file_sk ?? null,
+            status_aktif: 'AKTIF',
+            is_homebase: true,
+            keterangan: 'Homebase',
+          },
+        });
+        if (sk.jabatan) {
+          await tx.pegawai.update({
+            where: { id: sk.pegawai_id },
+            data: { jabatan: sk.jabatan },
+          });
+        }
 
         return updated;
       }

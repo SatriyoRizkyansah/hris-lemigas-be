@@ -158,10 +158,21 @@ export class DanaOperasionalController {
     }
 
     const balance = await this.fund.getOperationalBalance(id);
-    return ok(
-      'Berhasil mengambil detail dana operasional',
-      this.mapItem(item, balance.total_terpakai),
-    );
+    const ledger = await this.fund.getDanaLedger(id);
+    const alokasi = await this.prisma.alokasiGajiTA.findMany({
+      where: { dana_operasional_id: id, status: 'AKTIF' },
+      include: { pegawai: { select: { id: true, nama: true, nip_nik: true } } },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    });
+    return ok('Berhasil mengambil detail dana operasional', {
+      ...this.mapItem(item, balance.total_terpakai),
+      transaksi_list: ledger.list,
+      total_debit: ledger.total_debit,
+      total_kredit: ledger.total_kredit,
+      saldo_ledger: ledger.saldo_ledger,
+      alokasi_list: alokasi,
+    });
   }
 
   @Post()

@@ -11,8 +11,11 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma.module.js';
 import {
@@ -31,6 +34,7 @@ import { AuditService } from '../../common/services/audit.service.js';
 import { AksiAudit } from '../../common/enums/hris.enum.js';
 import { FundService } from '../../common/services/fund.service.js';
 import { UnitScopeService } from '../../common/services/unit-scope.service.js';
+import { FileService } from '../../common/services/file.service.js';
 import {
   ok,
   created,
@@ -48,6 +52,7 @@ export class RoController {
     private readonly audit: AuditService,
     private readonly fund: FundService,
     private readonly unitScope: UnitScopeService,
+    private readonly fileService: FileService,
   ) {}
 
   @Get()
@@ -140,10 +145,42 @@ export class RoController {
     }
 
     const balance = await this.fund.getRoBalance(ro.id);
-    return ok(
-      'Berhasil mengambil detail RO',
-      this.mapItem(ro, balance.total_terpakai),
-    );
+    const ledger = await this.fund.getRoLedger(ro.id);
+    const alokasi = await this.prisma.alokasiGajiTA.findMany({
+      where: { ro_id: ro.id, status: 'AKTIF' },
+      include: { pegawai: { select: { id: true, nama: true, nip_nik: true } } },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    });
+    return ok('Berhasil mengambil detail RO', {
+      ...this.mapItem(ro, balance.total_terpakai),
+      transaksi_list: ledger.list,
+      total_debit: ledger.total_debit,
+      total_kredit: ledger.total_kredit,
+      saldo_ledger: ledger.saldo_ledger,
+      alokasi_list: alokasi,
+    });
+  }
+
+  @Post(':id/rab')
+  @ApiRoles('Upload RAB RO', [Role.Superadmin, Role.Koordinator])
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadRab(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: any,
+  ) {
+    const ro = await this.prisma.ro.findUnique({ where: { id } });
+    if (!ro) throw new NotFoundException('RO tidak ditemukan');
+    const path = await this.fileService.uploadRab({
+      originalname: file.originalname,
+      buffer: file.buffer,
+    });
+    if (ro.file_rab) await this.fileService.delete(ro.file_rab);
+    const updated = await this.prisma.ro.update({
+      where: { id },
+      data: { file_rab: path },
+    });
+    return ok('Berhasil upload RAB', updated);
   }
 
   @Post()
@@ -181,6 +218,16 @@ export class RoController {
         unit_koordinator_id: body.id_unit_koordinator,
         tahun_fiscal: body.tahun_fiscal,
         total_plafon: body.total_plafon,
+        no_kontrak: (body as any).no_kontrak ?? null,
+        pj: (body as any).pj ?? null,
+        no_sk: (body as any).no_sk ?? null,
+        mulai_sk: (body as any).mulai_sk
+          ? new Date((body as any).mulai_sk)
+          : null,
+        berakhir_sk: (body as any).berakhir_sk
+          ? new Date((body as any).berakhir_sk)
+          : null,
+        status_ro: (body as any).status_ro ?? 'AKTIF',
       },
       include: {
         proyek: { select: { id: true, nama_proyek: true } },
@@ -227,6 +274,26 @@ export class RoController {
         ...(body.nama_ro !== undefined && { nama_ro: body.nama_ro }),
         ...(body.total_plafon !== undefined && {
           total_plafon: body.total_plafon,
+        }),
+        ...((body as any).no_kontrak !== undefined && {
+          no_kontrak: (body as any).no_kontrak,
+        }),
+        ...((body as any).pj !== undefined && { pj: (body as any).pj }),
+        ...((body as any).no_sk !== undefined && {
+          no_sk: (body as any).no_sk,
+        }),
+        ...((body as any).mulai_sk !== undefined && {
+          mulai_sk: (body as any).mulai_sk
+            ? new Date((body as any).mulai_sk)
+            : null,
+        }),
+        ...((body as any).berakhir_sk !== undefined && {
+          berakhir_sk: (body as any).berakhir_sk
+            ? new Date((body as any).berakhir_sk)
+            : null,
+        }),
+        ...((body as any).status_ro !== undefined && {
+          status_ro: (body as any).status_ro,
         }),
       },
       include: {
@@ -296,8 +363,15 @@ export class RoController {
       nama_proyek: ro.proyek?.nama_proyek ?? null,
       id_unit_koordinator: ro.unit_koordinator?.id ?? null,
       nama_unit_koordinator: ro.unit_koordinator?.nama_unit ?? null,
+      no_kontrak: ro.no_kontrak ?? null,
+      pj: ro.pj ?? null,
+      file_rab: ro.file_rab ?? null,
+      status_ro: ro.status_ro ?? 'AKTIF',
+      no_sk: ro.no_sk ?? null,
+      mulai_sk: ro.mulai_sk ?? null,
+      berakhir_sk: ro.berakhir_sk ?? null,
       created_at: ro.created_at,
       updated_at: ro.updated_at,
-    };
+    } as any;
   }
 }

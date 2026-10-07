@@ -60,6 +60,46 @@ export class FundService {
     };
   }
 
+  async getRoLedger(roId: string) {
+    const list = await this.prisma.roTransaksi.findMany({
+      where: { ro_id: roId },
+      orderBy: { tanggal: 'asc' },
+    });
+    const total_debit = list.reduce((s, r) => s + r.debit, 0);
+    const total_kredit = list.reduce((s, r) => s + r.kredit, 0);
+    let running = 0;
+    const withSaldo = list.map((r) => {
+      running += r.kredit - r.debit;
+      return { ...r, saldo: running };
+    });
+    return {
+      list: withSaldo,
+      total_debit,
+      total_kredit,
+      saldo_ledger: total_kredit - total_debit,
+    };
+  }
+
+  async getDanaLedger(danaId: string) {
+    const list = await this.prisma.danaTransaksi.findMany({
+      where: { dana_id: danaId },
+      orderBy: { tanggal: 'asc' },
+    });
+    const total_debit = list.reduce((s, r) => s + r.debit, 0);
+    const total_kredit = list.reduce((s, r) => s + r.kredit, 0);
+    let running = 0;
+    const withSaldo = list.map((r) => {
+      running += r.kredit - r.debit;
+      return { ...r, saldo: running };
+    });
+    return {
+      list: withSaldo,
+      total_debit,
+      total_kredit,
+      saldo_ledger: total_kredit - total_debit,
+    };
+  }
+
   /**
    * Validasi alokasi terhadap sisa saldo sumber dana.
    */

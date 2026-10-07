@@ -82,11 +82,44 @@ export class PegawaiPutController {
         ...(body.gaji_bulanan !== undefined && {
           gaji_bulanan: body.gaji_bulanan,
         }),
-        ...(body.id_unit_kerja !== undefined && {
-          unit_kerja_id: body.id_unit_kerja,
+        ...((body as any).ta_kategori !== undefined && {
+          ta_kategori: (body as any).ta_kategori,
         }),
       },
     });
+
+    if (body.id_unit_kerja !== undefined) {
+      if (body.id_unit_kerja) {
+        await this.prisma.penempatanPegawai.updateMany({
+          where: { pegawai_id: id, is_homebase: true, status_aktif: 'AKTIF' },
+          data: {
+            is_homebase: false,
+            status_aktif: 'NONAKTIF',
+            tanggal_selesai: new Date(),
+          },
+        });
+        await this.prisma.penempatanPegawai.create({
+          data: {
+            pegawai_id: id,
+            unit_kerja_id: body.id_unit_kerja,
+            jabatan: body.jabatan ?? updated.jabatan ?? null,
+            tmt: new Date(),
+            status_aktif: 'AKTIF',
+            is_homebase: true,
+            keterangan: 'Homebase',
+          },
+        });
+      } else {
+        await this.prisma.penempatanPegawai.updateMany({
+          where: { pegawai_id: id, is_homebase: true },
+          data: {
+            is_homebase: false,
+            status_aktif: 'NONAKTIF',
+            tanggal_selesai: new Date(),
+          },
+        });
+      }
+    }
 
     await this.audit.log({
       tabel: 'pegawai',

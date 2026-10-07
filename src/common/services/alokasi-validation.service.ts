@@ -42,9 +42,16 @@ export class AlokasiValidationService {
     if (pegawai.status_aktif !== 'AKTIF') {
       throw new BadRequestException('Pegawai tidak aktif');
     }
-    if (!pegawai.unit_kerja_id) {
+    const penempatanAktif = await this.prisma.penempatanPegawai.findFirst({
+      where: {
+        pegawai_id: pegawai.id,
+        is_homebase: true,
+        status_aktif: 'AKTIF',
+      },
+    });
+    if (!penempatanAktif) {
       throw new BadRequestException(
-        'Pegawai TA belum memiliki unit kerja aktif (SK aktif diperlukan)',
+        'Pegawai TA belum memiliki penempatan aktif (homebase diperlukan)',
       );
     }
 
@@ -56,14 +63,22 @@ export class AlokasiValidationService {
       throw new BadRequestException('Pegawai belum memiliki SK aktif');
     }
 
-    // Root koordinator dari unit pegawai
+    // Root koordinator dari unit pegawai (via penempatan)
     const rootKoordinator = await this.unitScope.resolveRootCoordinator(
-      pegawai.unit_kerja_id,
+      penempatanAktif.unit_kerja_id,
     );
     if (!rootKoordinator) {
       throw new BadRequestException(
         'Unit kerja pegawai tidak terhubung ke unit koordinator',
       );
+    }
+
+    // TA RO wajib dibayar dari RO, TA BIASA fleksibel
+    if (
+      (pegawai as any).ta_kategori === 'RO' &&
+      input.sumberDana !== SumberDana.RO
+    ) {
+      throw new BadRequestException('TA RO wajib dibayar dari dana RO');
     }
 
     if (input.sumberDana === SumberDana.RO) {

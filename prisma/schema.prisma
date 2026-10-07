@@ -21,6 +21,17 @@ enum TipePegawai {
   TA
 }
 
+enum TaKategori {
+  BIASA
+  RO
+}
+
+enum StatusRo {
+  AKTIF
+  NONAKTIF
+  SELESAI
+}
+
 enum TipeUnit {
   KOORDINATOR
   SUB_KOORDINATOR
@@ -101,7 +112,7 @@ model UnitKerja {
 
   kepala_unit Pegawai? @relation("KepalaUnit", fields: [kepala_unit_id], references: [id])
 
-  pegawai_list     Pegawai[]
+  penempatan_list  PenempatanPegawai[]
   sk_list          Sk[]
   ro_list          Ro[]
   dana_operasional DanaOperasional[]
@@ -126,27 +137,52 @@ model Pegawai {
   status_aktif  StatusAktif @default(AKTIF)
 
   // Khusus TA
-  bidang_keahlian String?   @db.VarChar(150)
-  kontrak_mulai   DateTime? @db.Date
-  kontrak_selesai DateTime? @db.Date
-  gaji_bulanan    Int       @default(0)
+  bidang_keahlian String?    @db.VarChar(150)
+  kontrak_mulai   DateTime?  @db.Date
+  kontrak_selesai DateTime?  @db.Date
+  gaji_bulanan    Int        @default(0)
+  ta_kategori     TaKategori @default(BIASA)
 
-  // Unit kerja aktif (dibuktikan SK aktif)
-  unit_kerja_id String?   @db.Uuid
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
-  unit_kerja  UnitKerja?  @relation(fields: [unit_kerja_id], references: [id])
   kepala_dari UnitKerja[] @relation("KepalaUnit")
 
-  sk_list      Sk[]
-  alokasi_list AlokasiGajiTA[]
-  user_akun    User?
+  penempatan_list PenempatanPegawai[]
+  sk_list         Sk[]
+  alokasi_list    AlokasiGajiTA[]
+  user_akun       User?
 
   @@index([tipe_pegawai])
   @@index([status_aktif])
-  @@index([unit_kerja_id])
   @@map("pegawai")
+}
+
+// ─── 3b. PENEMPATAN PEGAWAI (HOMEBASE HISTORY) ─────────────────────────────
+
+model PenempatanPegawai {
+  id            String      @id @default(uuid()) @db.Uuid
+  pegawai_id    String      @db.Uuid
+  unit_kerja_id String      @db.Uuid
+  jabatan       String?     @db.VarChar(150)
+  tmt           DateTime    @db.Date
+  tanggal_selesai DateTime? @db.Date
+  no_sk         String?     @db.VarChar(100)
+  file_sk       String?     @db.VarChar(500)
+  status_aktif  StatusAktif @default(AKTIF)
+  is_homebase   Boolean     @default(true)
+  keterangan    String?     @db.VarChar(256)
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+
+  pegawai    Pegawai   @relation(fields: [pegawai_id], references: [id], onDelete: Cascade)
+  unit_kerja UnitKerja @relation(fields: [unit_kerja_id], references: [id])
+
+  @@index([pegawai_id])
+  @@index([unit_kerja_id])
+  @@index([status_aktif])
+  @@index([is_homebase])
+  @@map("penempatan_pegawai")
 }
 
 // ─── 4. SK (SURAT KEPUTUSAN PENUGASAN) ─────────────────────────────────────
@@ -198,18 +234,45 @@ model Ro {
   unit_koordinator_id String   @db.Uuid
   tahun_fiscal        Int
   total_plafon        Int      @default(0)
+  no_kontrak          String?  @db.VarChar(100)
+  pj                  String?  @db.VarChar(150)
+  file_rab            String?  @db.VarChar(500)
+  status_ro           StatusRo @default(AKTIF)
+  no_sk               String?  @db.VarChar(100)
+  mulai_sk            DateTime? @db.Date
+  berakhir_sk         DateTime? @db.Date
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
 
   proyek           Proyek    @relation(fields: [proyek_id], references: [id])
   unit_koordinator UnitKerja @relation(fields: [unit_koordinator_id], references: [id])
 
-  alokasi_list AlokasiGajiTA[]
+  alokasi_list   AlokasiGajiTA[]
+  transaksi_list RoTransaksi[]
 
   @@index([proyek_id])
   @@index([unit_koordinator_id])
   @@index([tahun_fiscal])
   @@map("ro")
+}
+
+model RoTransaksi {
+  id            String   @id @default(uuid()) @db.Uuid
+  ro_id         String   @db.Uuid
+  nama_kegiatan String   @db.VarChar(200)
+  no_kuitansi   String?  @db.VarChar(100)
+  tanggal       DateTime @db.Date
+  debit         Int      @default(0)
+  kredit        Int      @default(0)
+  keterangan    String?  @db.VarChar(255)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  ro Ro @relation(fields: [ro_id], references: [id], onDelete: Cascade)
+
+  @@index([ro_id])
+  @@index([tanggal])
+  @@map("ro_transaksi")
 }
 
 // ─── 6. DANA OPERASIONAL KOORDINATOR ───────────────────────────────────────
@@ -224,10 +287,30 @@ model DanaOperasional {
 
   unit_koordinator UnitKerja @relation(fields: [unit_koordinator_id], references: [id])
 
-  alokasi_list AlokasiGajiTA[]
+  alokasi_list     AlokasiGajiTA[]
+  transaksi_list   DanaTransaksi[]
 
   @@unique([unit_koordinator_id, tahun_fiscal])
   @@map("dana_operasional")
+}
+
+model DanaTransaksi {
+  id            String   @id @default(uuid()) @db.Uuid
+  dana_id       String   @db.Uuid
+  nama_kegiatan String   @db.VarChar(200)
+  no_kuitansi   String?  @db.VarChar(100)
+  tanggal       DateTime @db.Date
+  debit         Int      @default(0)
+  kredit        Int      @default(0)
+  keterangan    String?  @db.VarChar(255)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  dana DanaOperasional @relation(fields: [dana_id], references: [id], onDelete: Cascade)
+
+  @@index([dana_id])
+  @@index([tanggal])
+  @@map("dana_transaksi")
 }
 
 // ─── 7. ALOKASI GAJI TA ────────────────────────────────────────────────────

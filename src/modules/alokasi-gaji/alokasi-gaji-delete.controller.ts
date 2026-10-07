@@ -48,8 +48,11 @@ export class AlokasiDeleteController {
             id: true,
             nama: true,
             nip_nik: true,
-            unit_kerja_id: true,
-            unit_kerja: { select: { id: true, nama_unit: true } },
+            penempatan_list: {
+              where: { is_homebase: true, status_aktif: 'AKTIF' },
+              select: { unit_kerja_id: true },
+              take: 1,
+            },
           },
         },
       },
@@ -60,16 +63,18 @@ export class AlokasiDeleteController {
       throw new BadRequestException('Alokasi sudah dibatalkan');
     }
 
-    // Scope koordinator
+    // Scope koordinator via penempatan
     if (user.role === Role.Koordinator) {
       if (!user.unitKerjaId) {
         throw new ForbiddenException(
           'Akun koordinator belum memiliki unit kerja',
         );
       }
-      if (existing.pegawai.unit_kerja_id) {
+      const unitId = (existing.pegawai as any).penempatan_list?.[0]
+        ?.unit_kerja_id;
+      if (unitId) {
         const inScope = await this.unitScope.isUnitInScope(
-          existing.pegawai.unit_kerja_id,
+          unitId,
           user.unitKerjaId,
         );
         if (!inScope) {
@@ -91,7 +96,11 @@ export class AlokasiDeleteController {
             nip_nik: true,
             tipe_pegawai: true,
             gaji_bulanan: true,
-            unit_kerja: { select: { id: true, nama_unit: true } },
+            penempatan_list: {
+              where: { is_homebase: true, status_aktif: 'AKTIF' },
+              select: { unit_kerja: { select: { id: true, nama_unit: true } } },
+              take: 1,
+            },
           },
         },
         ro: { select: { id: true, kode_ro: true, nama_ro: true } },
