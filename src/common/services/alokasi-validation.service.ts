@@ -48,6 +48,14 @@ export class AlokasiValidationService {
       );
     }
 
+    // Pastikan ada SK aktif
+    const activeSk = await this.prisma.sk.findFirst({
+      where: { pegawai_id: pegawai.id, status_aktif: 'AKTIF' },
+    });
+    if (!activeSk) {
+      throw new BadRequestException('Pegawai belum memiliki SK aktif');
+    }
+
     // Root koordinator dari unit pegawai
     const rootKoordinator = await this.unitScope.resolveRootCoordinator(
       pegawai.unit_kerja_id,

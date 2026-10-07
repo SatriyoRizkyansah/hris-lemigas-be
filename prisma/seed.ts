@@ -59,6 +59,60 @@ async function main() {
       tipe_unit: 'KOORDINATOR',
     },
   });
+  const unitKor3 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'KOR-03' },
+    update: { nama_unit: 'Koordinator Bagian Umum' },
+    create: {
+      kode_unit: 'KOR-03',
+      nama_unit: 'Koordinator Bagian Umum',
+      tipe_unit: 'KOORDINATOR',
+    },
+  });
+  const unitKor4 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'KOR-04' },
+    update: { nama_unit: 'Koordinator Pelayanan Jasa' },
+    create: {
+      kode_unit: 'KOR-04',
+      nama_unit: 'Koordinator Pelayanan Jasa',
+      tipe_unit: 'KOORDINATOR',
+    },
+  });
+  const unitKor5 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'KOR-05' },
+    update: { nama_unit: 'Koordinator Pelayanan Migas' },
+    create: {
+      kode_unit: 'KOR-05',
+      nama_unit: 'Koordinator Pelayanan Migas Minyak dan Gas Bumi',
+      tipe_unit: 'KOORDINATOR',
+    },
+  });
+  const unitKor6 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'KOR-06' },
+    update: { nama_unit: 'Koordinator Pengolahan Migas' },
+    create: {
+      kode_unit: 'KOR-06',
+      nama_unit: 'Koordinator Pengolahan Migas Minyak dan Gas Bumi',
+      tipe_unit: 'KOORDINATOR',
+    },
+  });
+  const unitKor7 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'KOR-07' },
+    update: { nama_unit: 'Koordinator Pengolahan Migas' },
+    create: {
+      kode_unit: 'KOR-07',
+      nama_unit: 'Koordinator Pengolahan Migas Minyak dan Gas Bumi',
+      tipe_unit: 'KOORDINATOR',
+    },
+  });
+  const unitKor8 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'KOR-08' },
+    update: { nama_unit: 'Koordinator Pengembangan Aset' },
+    create: {
+      kode_unit: 'KOR-08',
+      nama_unit: 'Koordinator Pengembangan Aset Minyak dan Gas Bumi',
+      tipe_unit: 'KOORDINATOR',
+    },
+  });
 
   const unitWK1 = await prisma.unitKerja.upsert({
     where: { kode_unit: 'WK-01' },
@@ -98,6 +152,97 @@ async function main() {
       nama_unit: 'Sub Koordinator Pengembangan',
       tipe_unit: 'SUB_KOORDINATOR',
       parent_unit_id: unitKor2.id,
+    },
+  });
+
+  const subUmum1 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'UM-01' },
+    update: { parent_unit_id: unitKor3.id },
+    create: {
+      kode_unit: 'UM-01',
+      nama_unit: 'Sub Koordinator Pembinaan Aparatur & Pengembangan Kompetensi',
+      tipe_unit: 'SUB_KOORDINATOR',
+      parent_unit_id: unitKor3.id,
+    },
+  });
+  const subUmum2 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'UM-02' },
+    update: { parent_unit_id: unitKor3.id },
+    create: {
+      kode_unit: 'UM-02',
+      nama_unit: 'Sub Koordinator Perencanaan',
+      tipe_unit: 'SUB_KOORDINATOR',
+      parent_unit_id: unitKor3.id,
+    },
+  });
+  const subSDM1 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'SDM-03' },
+    update: { parent_unit_id: unitKor4.id },
+    create: {
+      kode_unit: 'SDM-03',
+      nama_unit: 'Sub Koordinator Rekrutmen',
+      tipe_unit: 'SUB_KOORDINATOR',
+      parent_unit_id: unitKor4.id,
+    },
+  });
+  const subSDM2 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'SDM-04' },
+    update: { parent_unit_id: unitKor4.id },
+    create: {
+      kode_unit: 'SDM-04',
+      nama_unit: 'Sub Koordinator Pengembangan',
+      tipe_unit: 'SUB_KOORDINATOR',
+      parent_unit_id: unitKor4.id,
+    },
+  });
+  const subWK1 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'WK-03' },
+    update: { parent_unit_id: unitKor5.id },
+    create: {
+      kode_unit: 'WK-03',
+      nama_unit: 'Sub Koordinator Wilayah Kerja Utara',
+      tipe_unit: 'SUB_KOORDINATOR',
+      parent_unit_id: unitKor5.id,
+    },
+  });
+  const subWK2 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'WK-04' },
+    update: { parent_unit_id: unitKor5.id },
+    create: {
+      kode_unit: 'WK-04',
+      nama_unit: 'Sub Koordinator Wilayah Kerja Selatan',
+      tipe_unit: 'SUB_KOORDINATOR',
+      parent_unit_id: unitKor5.id,
+    },
+  });
+  const subKor6 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'KOR-07' },
+    update: { parent_unit_id: unitKor6.id },
+    create: {
+      kode_unit: 'KOR-07',
+      nama_unit: 'Sub Koordinator Pengolahan Migas',
+      tipe_unit: 'SUB_KOORDINATOR',
+      parent_unit_id: unitKor6.id,
+    },
+  });
+  const subKor7 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'KOR-08' },
+    update: { parent_unit_id: unitKor7.id },
+    create: {
+      kode_unit: 'KOR-08',
+      nama_unit: 'Sub Koordinator Pengolahan Migas',
+      tipe_unit: 'SUB_KOORDINATOR',
+      parent_unit_id: unitKor7.id,
+    },
+  });
+  const subKor8 = await prisma.unitKerja.upsert({
+    where: { kode_unit: 'KOR-09' },
+    update: { parent_unit_id: unitKor8.id },
+    create: {
+      kode_unit: 'KOR-09',
+      nama_unit: 'Sub Koordinator Pengembangan Aset',
+      tipe_unit: 'SUB_KOORDINATOR',
+      parent_unit_id: unitKor8.id,
     },
   });
 
@@ -244,16 +389,29 @@ async function main() {
     },
   ];
 
-  // +1 lagi supaya 15 total? Master plan minta 15 — tambah 1 TA lagi
-  pegawaiData.push({
-    nip_nik: 'TA-005',
-    nama: 'Fajar Ramadhan',
-    tipe: 'TA',
-    jabatan: 'Teknisi Pendukung',
-    email: 'fajar.ramadhan@kontrak.co.id',
-    unitId: unitWK1.id,
-    gaji: 3800000,
-    bidang: 'Teknik Mesin',
+  // Generate additional generic staff to ensure each koordinator has ~20 employees
+  const koordinatorUnits = [
+    unitKor1,
+    unitKor2,
+    unitKor3,
+    unitKor4,
+    unitKor5,
+    unitKor6,
+    unitKor7,
+    unitKor8,
+  ];
+  koordinatorUnits.forEach((kor, idx) => {
+    for (let i = 1; i <= 12; i++) {
+      pegawaiData.push({
+        nip_nik: `KOR${idx + 1}-${i.toString().padStart(2, '0')}`,
+        nama: `Staff Koordinator ${idx + 1} ${i}`,
+        tipe: 'PNS',
+        jabatan: `Staf Administrasi Koordinator ${idx + 1} ${i}`,
+        email: `staff${idx + 1}_${i}@lemigas.esdm.go.id`,
+        unitId: kor.id,
+        gaji: 12000000,
+      });
+    }
   });
 
   const pegawaiMap = new Map<string, string>();
