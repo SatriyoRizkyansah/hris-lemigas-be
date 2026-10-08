@@ -442,33 +442,6 @@ async function main() {
       },
     });
     pegawaiMap.set(p.nip_nik, existing.id);
-    // homebase penempatan
-    const existingPenempatan = await prisma.penempatanPegawai.findFirst({
-      where: {
-        pegawai_id: existing.id,
-        is_homebase: true,
-        status_aktif: 'AKTIF',
-      },
-    });
-    if (!existingPenempatan) {
-      await prisma.penempatanPegawai.create({
-        data: {
-          pegawai_id: existing.id,
-          unit_kerja_id: p.unitId,
-          jabatan: p.jabatan,
-          tmt: new Date('2026-01-01'),
-          no_sk: `SK/${p.nip_nik}/2026`,
-          status_aktif: 'AKTIF',
-          is_homebase: true,
-          keterangan: 'Homebase',
-        },
-      });
-    } else if (existingPenempatan.unit_kerja_id !== p.unitId) {
-      await prisma.penempatanPegawai.update({
-        where: { id: existingPenempatan.id },
-        data: { unit_kerja_id: p.unitId, jabatan: p.jabatan },
-      });
-    }
   }
 
   // ─── SK Aktif (bukti unit kerja & jabatan) ─────────────────────────────

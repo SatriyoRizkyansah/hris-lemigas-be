@@ -70,7 +70,7 @@ export class AlokasiRekapController {
         status_aktif: 'AKTIF',
         ...(unitIds && unitIds.length > 0
           ? {
-              penempatan_list: {
+              sk_list: {
                 some: {
                   unit_kerja_id: { in: unitIds },
                   is_homebase: true,
@@ -81,14 +81,12 @@ export class AlokasiRekapController {
           : {}),
       },
       include: {
-        penempatan_list: {
-          where: { is_homebase: true, status_aktif: 'AKTIF' },
-          select: { unit_kerja: { select: { id: true, nama_unit: true } } },
-          take: 1,
-        },
         sk_list: {
-          where: { status_aktif: 'AKTIF' },
-          select: { gaji_bulanan: true },
+          where: { is_homebase: true, status_aktif: 'AKTIF' },
+          select: {
+            gaji_bulanan: true,
+            unit_kerja: { select: { id: true, nama_unit: true } },
+          },
           orderBy: { tanggal_efektif: 'desc' },
           take: 1,
         },
@@ -119,7 +117,7 @@ export class AlokasiRekapController {
       const alokasi_operasional = pegawai.alokasi_list
         .filter((a: any) => a.sumber_dana === 'OPERASIONAL')
         .reduce((acc: number, a: any) => acc + a.jumlah, 0);
-      const uk = pegawai.penempatan_list?.[0]?.unit_kerja ?? null;
+      const uk = pegawai.sk_list?.[0]?.unit_kerja ?? null;
 
       return {
         id_pegawai: pegawai.id,
@@ -176,7 +174,7 @@ export class AlokasiRekapController {
         status_aktif: 'AKTIF',
         ...(unitIds && unitIds.length > 0
           ? {
-              penempatan_list: {
+              sk_list: {
                 some: {
                   unit_kerja_id: { in: unitIds },
                   is_homebase: true,
@@ -187,14 +185,12 @@ export class AlokasiRekapController {
           : {}),
       },
       include: {
-        penempatan_list: {
-          where: { is_homebase: true, status_aktif: 'AKTIF' },
-          select: { unit_kerja: { select: { nama_unit: true } } },
-          take: 1,
-        },
         sk_list: {
-          where: { status_aktif: 'AKTIF' },
-          select: { gaji_bulanan: true },
+          where: { is_homebase: true, status_aktif: 'AKTIF' },
+          select: {
+            gaji_bulanan: true,
+            unit_kerja: { select: { nama_unit: true } },
+          },
           orderBy: { tanggal_efektif: 'desc' },
           take: 1,
         },
@@ -278,8 +274,7 @@ export class AlokasiRekapController {
         no: no++,
         nip_nik: pegawai.nip_nik,
         nama: pegawai.nama,
-        unit:
-          (pegawai as any).penempatan_list?.[0]?.unit_kerja?.nama_unit ?? '-',
+        unit: (pegawai as any).sk_list?.[0]?.unit_kerja?.nama_unit ?? '-',
         gaji,
         alokasi_ro,
         alokasi_operasional,

@@ -35,18 +35,14 @@ export class MyProfileController {
         unit_kerja: { select: { id: true, kode_unit: true, nama_unit: true } },
         pegawai: {
           include: {
-            penempatan_list: {
+            sk_list: {
               where: { is_homebase: true, status_aktif: 'AKTIF' },
               include: {
                 unit_kerja: {
                   select: { id: true, kode_unit: true, nama_unit: true },
                 },
               },
-              take: 1,
-            },
-            sk_list: {
-              where: { status_aktif: 'AKTIF' },
-              orderBy: { created_at: 'desc' },
+              orderBy: { tanggal_efektif: 'desc' },
               take: 1,
             },
           },
@@ -75,13 +71,11 @@ export class MyProfileController {
             tipe_pegawai: pegawai.tipe_pegawai,
             gaji_bulanan: (pegawai as any).sk_list?.[0]?.gaji_bulanan ?? 0,
             status_aktif: pegawai.status_aktif,
-            unit_kerja: (pegawai as any).penempatan_list?.[0]?.unit_kerja
+            unit_kerja: (pegawai as any).sk_list?.[0]?.unit_kerja
               ? {
-                  id: (pegawai as any).penempatan_list[0].unit_kerja.id,
-                  kode_unit: (pegawai as any).penempatan_list[0].unit_kerja
-                    .kode_unit,
-                  nama_unit: (pegawai as any).penempatan_list[0].unit_kerja
-                    .nama_unit,
+                  id: (pegawai as any).sk_list[0].unit_kerja.id,
+                  kode_unit: (pegawai as any).sk_list[0].unit_kerja.kode_unit,
+                  nama_unit: (pegawai as any).sk_list[0].unit_kerja.nama_unit,
                 }
               : null,
             sk_aktif: pegawai.sk_list?.[0]

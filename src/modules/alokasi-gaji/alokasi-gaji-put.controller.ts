@@ -54,7 +54,7 @@ export class AlokasiPutController {
             id: true,
             nama: true,
             nip_nik: true,
-            penempatan_list: {
+            sk_list: {
               where: { is_homebase: true, status_aktif: 'AKTIF' },
               select: { unit_kerja_id: true },
               take: 1,
@@ -71,15 +71,14 @@ export class AlokasiPutController {
       );
     }
 
-    // Scope koordinator via penempatan
+    // Scope koordinator via SK homebase
     if (user.role === Role.Koordinator) {
       if (!user.unitKerjaId) {
         throw new ForbiddenException(
           'Akun koordinator belum memiliki unit kerja',
         );
       }
-      const unitId = (existing.pegawai as any).penempatan_list?.[0]
-        ?.unit_kerja_id;
+      const unitId = (existing.pegawai as any).sk_list?.[0]?.unit_kerja_id;
       if (unitId) {
         const inScope = await this.unitScope.isUnitInScope(
           unitId,
@@ -316,16 +315,13 @@ export class AlokasiPutController {
               nama: true,
               nip_nik: true,
               tipe_pegawai: true,
-              penempatan_list: {
+              sk_list: {
                 where: { is_homebase: true, status_aktif: 'AKTIF' },
                 select: {
+                  gaji_bulanan: true,
                   unit_kerja: { select: { id: true, nama_unit: true } },
                 },
-                take: 1,
-              },
-              sk_list: {
-                where: { status_aktif: 'AKTIF' },
-                select: { gaji_bulanan: true },
+                orderBy: { tanggal_efektif: 'desc' },
                 take: 1,
               },
             },
@@ -366,9 +362,9 @@ export class AlokasiPutController {
       nip_nik: item.pegawai?.nip_nik ?? null,
       tipe_pegawai: item.pegawai?.tipe_pegawai ?? null,
       gaji_bulanan: item.pegawai?.sk_list?.[0]?.gaji_bulanan ?? null,
-      id_unit_kerja: item.pegawai?.penempatan_list?.[0]?.unit_kerja?.id ?? null,
+      id_unit_kerja: item.pegawai?.sk_list?.[0]?.unit_kerja?.id ?? null,
       nama_unit_kerja:
-        item.pegawai?.penempatan_list?.[0]?.unit_kerja?.nama_unit ?? null,
+        item.pegawai?.sk_list?.[0]?.unit_kerja?.nama_unit ?? null,
       id_ro: item.ro?.id ?? null,
       nama_ro: item.ro ? `${item.ro.kode_ro} - ${item.ro.nama_ro}` : null,
       id_dana_operasional: item.dana_operasional?.id ?? null,

@@ -85,44 +85,7 @@ export class PegawaiPutController {
       },
     });
 
-    if (body.id_unit_kerja !== undefined) {
-      const homebase = await this.prisma.penempatanPegawai.findFirst({
-        where: { pegawai_id: id, is_homebase: true, status_aktif: 'AKTIF' },
-      });
-      if (
-        body.id_unit_kerja &&
-        body.id_unit_kerja !== homebase?.unit_kerja_id
-      ) {
-        await this.prisma.penempatanPegawai.updateMany({
-          where: { pegawai_id: id, is_homebase: true, status_aktif: 'AKTIF' },
-          data: {
-            is_homebase: false,
-            status_aktif: 'NONAKTIF',
-            tanggal_selesai: new Date(),
-          },
-        });
-        await this.prisma.penempatanPegawai.create({
-          data: {
-            pegawai_id: id,
-            unit_kerja_id: body.id_unit_kerja,
-            jabatan: body.jabatan ?? updated.jabatan ?? null,
-            tmt: new Date(),
-            status_aktif: 'AKTIF',
-            is_homebase: true,
-            keterangan: 'Homebase',
-          },
-        });
-      } else if (!body.id_unit_kerja && homebase) {
-        await this.prisma.penempatanPegawai.updateMany({
-          where: { pegawai_id: id, is_homebase: true },
-          data: {
-            is_homebase: false,
-            status_aktif: 'NONAKTIF',
-            tanggal_selesai: new Date(),
-          },
-        });
-      }
-    }
+    // Penempatan kini via SK — id_unit_kerja diabaikan di update pegawai, gunakan endpoint SK
 
     await this.audit.log({
       tabel: 'pegawai',

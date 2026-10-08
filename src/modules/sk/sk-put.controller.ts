@@ -119,24 +119,8 @@ export class SkPutController {
       });
 
       if (updated.status_aktif === 'AKTIF') {
-        await tx.penempatanPegawai.updateMany({
-          where: {
-            pegawai_id: updated.pegawai_id,
-            no_sk: existing.nomor_sk,
-            is_homebase: true,
-            status_aktif: 'AKTIF',
-          },
-          data: {
-            unit_kerja_id: updated.unit_kerja_id,
-            jabatan: updated.jabatan,
-            tmt: updated.tanggal_efektif,
-            no_sk: updated.nomor_sk,
-            file_sk: updated.file_sk,
-          },
-        });
         const pegawaiPatch: any = {};
         if (body.jabatan !== undefined) pegawaiPatch.jabatan = updated.jabatan;
-        // Kontrak mengikuti periode SK aktif
         if (
           body.tanggal_efektif !== undefined ||
           body.tanggal_selesai !== undefined
@@ -207,32 +191,6 @@ export class SkPutController {
           },
         });
 
-        // Sinkronkan penempatan homebase & jabatan pegawai
-        await tx.penempatanPegawai.updateMany({
-          where: {
-            pegawai_id: sk.pegawai_id,
-            is_homebase: true,
-            status_aktif: 'AKTIF',
-          },
-          data: {
-            is_homebase: false,
-            status_aktif: 'NONAKTIF',
-            tanggal_selesai: new Date(),
-          },
-        });
-        await tx.penempatanPegawai.create({
-          data: {
-            pegawai_id: sk.pegawai_id,
-            unit_kerja_id: sk.unit_kerja_id,
-            jabatan: sk.jabatan ?? null,
-            tmt: sk.tanggal_efektif,
-            no_sk: sk.nomor_sk,
-            file_sk: sk.file_sk ?? null,
-            status_aktif: 'AKTIF',
-            is_homebase: true,
-            keterangan: 'Homebase',
-          },
-        });
         const pegawaiPatch2: any = {};
         if (sk.jabatan) pegawaiPatch2.jabatan = sk.jabatan;
         pegawaiPatch2.kontrak_mulai = sk.tanggal_efektif;
@@ -280,6 +238,12 @@ export class SkPutController {
       tanggal_selesai: sk.tanggal_selesai ?? null,
       jabatan: sk.jabatan ?? null,
       file_sk: sk.file_sk ?? null,
+      gaji_bulanan: sk.gaji_bulanan ?? 0,
+      sumber_dana_default: sk.sumber_dana_default ?? null,
+      ro_id_default: sk.ro_id_default ?? null,
+      dana_operasional_id_default: sk.dana_operasional_id_default ?? null,
+      is_homebase: sk.is_homebase ?? true,
+      keterangan: sk.keterangan ?? null,
       status_aktif: sk.status_aktif,
       id_pegawai: sk.pegawai?.id ?? null,
       nama_pegawai: sk.pegawai?.nama ?? null,

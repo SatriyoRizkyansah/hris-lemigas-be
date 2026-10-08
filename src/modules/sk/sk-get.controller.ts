@@ -157,7 +157,7 @@ export class SkGetController {
     const pegawai = await this.prisma.pegawai.findUnique({
       where: { id: pegawaiId },
       include: {
-        penempatan_list: {
+        sk_list: {
           where: { is_homebase: true, status_aktif: 'AKTIF' },
           select: { unit_kerja_id: true },
           take: 1,
@@ -169,7 +169,7 @@ export class SkGetController {
     }
 
     if (user.role === Role.Koordinator && user.unitKerjaId) {
-      const unitId = (pegawai as any).penempatan_list?.[0]?.unit_kerja_id;
+      const unitId = (pegawai as any).sk_list?.[0]?.unit_kerja_id;
       if (unitId) {
         const inScope = await this.unitScope.isUnitInScope(
           unitId,
@@ -224,6 +224,8 @@ export class SkGetController {
       sumber_dana_default: sk.sumber_dana_default ?? null,
       ro_id_default: sk.ro_id_default ?? null,
       dana_operasional_id_default: sk.dana_operasional_id_default ?? null,
+      is_homebase: sk.is_homebase ?? true,
+      keterangan: sk.keterangan ?? null,
       status_aktif: sk.status_aktif,
       id_pegawai: sk.pegawai?.id ?? null,
       nama_pegawai: sk.pegawai?.nama ?? null,

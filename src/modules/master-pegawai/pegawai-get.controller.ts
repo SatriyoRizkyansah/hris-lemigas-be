@@ -47,8 +47,8 @@ export class PegawaiGetController {
 
     if (query.tipe_pegawai) where.tipe_pegawai = query.tipe_pegawai;
     if (query.status_aktif) where.status_aktif = query.status_aktif;
-    const penempatanFilter = (ids: string[]) => ({
-      penempatan_list: {
+    const skFilter = (ids: string[]) => ({
+      sk_list: {
         some: {
           unit_kerja_id: { in: ids },
           is_homebase: true,
@@ -58,10 +58,10 @@ export class PegawaiGetController {
     });
     if (query.id_unit_kerja) {
       const scoped = await this.unitScope.getScopedUnitIds(query.id_unit_kerja);
-      where.penempatan_list = penempatanFilter(scoped);
+      where.sk_list = skFilter(scoped);
     }
 
-    // Scope koordinator: hanya unit sendiri + anak unit (via penempatan homebase)
+    // Scope koordinator: hanya unit sendiri + anak unit (via SK homebase)
     if (user.role === Role.Koordinator) {
       if (!user.unitKerjaId) {
         return paginated(
@@ -75,9 +75,9 @@ export class PegawaiGetController {
       const scopedUnits = await this.unitScope.getScopedUnitIds(
         user.unitKerjaId,
       );
-      const unitFilter = penempatanFilter(scopedUnits);
-      where.penempatan_list = where.penempatan_list
-        ? { AND: [where.penempatan_list as object, unitFilter] }
+      const unitFilter = skFilter(scopedUnits);
+      where.sk_list = (where as any).sk_list
+        ? { AND: [(where as any).sk_list as object, unitFilter] }
         : unitFilter;
     }
 
@@ -94,7 +94,7 @@ export class PegawaiGetController {
       this.prisma.pegawai.findMany({
         where,
         include: {
-          penempatan_list: {
+          sk_list: {
             where: { is_homebase: true, status_aktif: 'AKTIF' },
             include: {
               unit_kerja: {
@@ -108,11 +108,6 @@ export class PegawaiGetController {
                 },
               },
             },
-            take: 1,
-          },
-          sk_list: {
-            where: { status_aktif: 'AKTIF' },
-            select: { gaji_bulanan: true },
             take: 1,
           },
         },
@@ -144,21 +139,6 @@ export class PegawaiGetController {
     const pegawai = (await this.prisma.pegawai.findUnique({
       where: { id },
       include: {
-        penempatan_list: {
-          orderBy: { tmt: 'desc' },
-          include: {
-            unit_kerja: {
-              select: {
-                id: true,
-                kode_unit: true,
-                nama_unit: true,
-                tipe_unit: true,
-                parent_unit_id: true,
-                kepala_unit: { select: { nama: true } },
-              },
-            },
-          },
-        },
         sk_list: {
           orderBy: { tanggal_efektif: 'desc' },
           include: {
@@ -184,12 +164,12 @@ export class PegawaiGetController {
       };
     }
 
-    // Scope check koordinator via penempatan homebase
+    // Scope check koordinator via SK homebase
     if (user.role === Role.Koordinator && user.unitKerjaId) {
       const homebase =
-        pegawai.penempatan_list?.find(
+        pegawai.sk_list?.find(
           (p: any) => p.is_homebase && p.status_aktif === 'AKTIF',
-        ) ?? pegawai.penempatan_list?.[0];
+        ) ?? pegawai.sk_list?.[0];
       const unitId = homebase?.unit_kerja_id ?? '';
       const inScope = unitId
         ? await this.unitScope.isUnitInScope(unitId, user.unitKerjaId)
@@ -211,6 +191,12 @@ export class PegawaiGetController {
       tanggal_selesai: sk.tanggal_selesai,
       jabatan: sk.jabatan,
       file_sk: sk.file_sk,
+      gaji_bulanan: sk.gaji_bulanan ?? null,
+      sumber_dana_default: sk.sumber_dana_default ?? null,
+      ro_id_default: sk.ro_id_default ?? null,
+      dana_operasional_id_default: sk.dana_operasional_id_default ?? null,
+      is_homebase: sk.is_homebase,
+      keterangan: sk.keterangan ?? null,
       status_aktif: sk.status_aktif,
       unit_kerja: sk.unit_kerja
         ? {
@@ -223,45 +209,18 @@ export class PegawaiGetController {
         : undefined,
     }));
 
-    const riwayat_penempatan = (pegawai.penempatan_list ?? []).map(
-      (p: any) => ({
-        id: p.id,
-        pegawai_id: p.pegawai_id,
-        unit_kerja: p.unit_kerja
-          ? {
-              id: p.unit_kerja.id,
-              kode_unit: p.unit_kerja.kode_unit,
-              nama_unit: p.unit_kerja.nama_unit,
-              tipe_unit: p.unit_kerja.tipe_unit,
-              parent_unit_id: p.unit_kerja.parent_unit_id ?? null,
-              kepala_unit_nama: p.unit_kerja.kepala_unit?.nama ?? null,
-            }
-          : null,
-        jabatan: p.jabatan ?? null,
-        tmt: p.tmt,
-        tanggal_selesai: p.tanggal_selesai ?? null,
-        no_sk: p.no_sk ?? null,
-        file_sk: p.file_sk ?? null,
-        status_aktif: p.status_aktif,
-        is_homebase: p.is_homebase,
-        keterangan: p.keterangan ?? null,
-        created_at: p.created_at,
-      }),
-    );
-
     return ok('Berhasil mengambil detail pegawai', {
       ...this.mapItem(pegawai),
       riwayat_sk: riwayat,
-      riwayat_penempatan,
     });
   }
 
   private mapItem(item: any): PegawaiItemDto {
     const homebase =
-      item.penempatan_list?.find(
+      item.sk_list?.find(
         (p: any) => p.is_homebase && p.status_aktif === 'AKTIF',
-      ) ?? item.penempatan_list?.[0];
-    const uk = homebase?.unit_kerja ?? item.unit_kerja ?? null;
+      ) ?? item.sk_list?.[0];
+    const uk = (homebase as any)?.unit_kerja ?? item.unit_kerja ?? null;
     return {
       id: item.id,
       nip_nik: item.nip_nik,

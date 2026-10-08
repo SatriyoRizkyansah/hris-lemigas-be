@@ -42,30 +42,22 @@ export class AlokasiValidationService {
     if (pegawai.status_aktif !== 'AKTIF') {
       throw new BadRequestException('Pegawai tidak aktif');
     }
-    const penempatanAktif = await this.prisma.penempatanPegawai.findFirst({
+    const activeSk = await this.prisma.sk.findFirst({
       where: {
         pegawai_id: pegawai.id,
         is_homebase: true,
         status_aktif: 'AKTIF',
       },
     });
-    if (!penempatanAktif) {
+    if (!activeSk) {
       throw new BadRequestException(
-        'Pegawai TA belum memiliki penempatan aktif (homebase diperlukan)',
+        'Pegawai TA belum memiliki SK homebase aktif (is_homebase=true diperlukan)',
       );
     }
 
-    // Pastikan ada SK aktif
-    const activeSk = await this.prisma.sk.findFirst({
-      where: { pegawai_id: pegawai.id, status_aktif: 'AKTIF' },
-    });
-    if (!activeSk) {
-      throw new BadRequestException('Pegawai belum memiliki SK aktif');
-    }
-
-    // Root koordinator dari unit pegawai (via penempatan)
+    // Root koordinator dari unit pegawai (via SK homebase)
     const rootKoordinator = await this.unitScope.resolveRootCoordinator(
-      penempatanAktif.unit_kerja_id,
+      activeSk.unit_kerja_id,
     );
     if (!rootKoordinator) {
       throw new BadRequestException(

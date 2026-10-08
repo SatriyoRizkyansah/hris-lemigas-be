@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
@@ -10,6 +11,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { PaginateQuery } from '../../common/dto/paginate-query.dto.js';
 import { EmptyToUndefined } from '../../common/utils/empty-to-undefined.js';
 import { SumberDana } from '../../common/enums/hris.enum.js';
@@ -98,6 +100,7 @@ export class CreateSkDto {
   @ApiPropertyOptional({ description: 'Default RO id jika sumber RO' })
   @IsUUID()
   @IsOptional()
+  @EmptyToUndefined()
   ro_id_default?: string;
 
   @ApiPropertyOptional({
@@ -105,7 +108,28 @@ export class CreateSkDto {
   })
   @IsUUID()
   @IsOptional()
+  @EmptyToUndefined()
   dana_operasional_id_default?: string;
+
+  @ApiPropertyOptional({
+    description: 'Tugas tambahan (true = rangkap, false = mutasi/perpanjangan)',
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @Type(() => Boolean)
+  is_tugas_tambahan?: boolean;
+
+  @ApiPropertyOptional({ description: 'Keterangan penempatan' })
+  @IsString()
+  @IsOptional()
+  @EmptyToUndefined()
+  keterangan?: string;
 }
 
 export class UpdateSkDto {
@@ -161,11 +185,13 @@ export class UpdateSkDto {
   @ApiPropertyOptional()
   @IsUUID()
   @IsOptional()
+  @EmptyToUndefined()
   ro_id_default?: string;
 
   @ApiPropertyOptional()
   @IsUUID()
   @IsOptional()
+  @EmptyToUndefined()
   dana_operasional_id_default?: string;
 }
 
@@ -207,6 +233,12 @@ export class SkItemDto {
 
   @ApiPropertyOptional({ nullable: true })
   dana_operasional_id_default?: string | null;
+
+  @ApiProperty({ description: 'Homebase (true) atau tugas tambahan (false)' })
+  is_homebase: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  keterangan?: string | null;
 
   @ApiProperty()
   status_aktif: string;

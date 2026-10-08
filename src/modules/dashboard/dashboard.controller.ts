@@ -96,7 +96,7 @@ export class DashboardController {
         where: {
           tipe_pegawai: 'TA',
           status_aktif: 'AKTIF',
-          penempatan_list: {
+          sk_list: {
             some: {
               unit_kerja_id: { in: scopedUnits },
               is_homebase: true,
@@ -211,7 +211,7 @@ export class DashboardController {
       this.prisma.pegawai.count({
         where: {
           status_aktif: 'AKTIF',
-          penempatan_list: {
+          sk_list: {
             some: {
               unit_kerja_id: { in: scopedUnits },
               is_homebase: true,
@@ -224,7 +224,7 @@ export class DashboardController {
         where: {
           tipe_pegawai: 'TA',
           status_aktif: 'AKTIF',
-          penempatan_list: {
+          sk_list: {
             some: {
               unit_kerja_id: { in: scopedUnits },
               is_homebase: true,
@@ -295,7 +295,7 @@ export class DashboardController {
         periode_bulan: now.getMonth() + 1,
         periode_tahun: now.getFullYear(),
         pegawai: {
-          penempatan_list: {
+          sk_list: {
             some: {
               unit_kerja_id: { in: scopedUnits },
               is_homebase: true,

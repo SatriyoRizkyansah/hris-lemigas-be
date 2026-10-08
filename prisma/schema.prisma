@@ -112,7 +112,6 @@ model UnitKerja {
 
   kepala_unit Pegawai? @relation("KepalaUnit", fields: [kepala_unit_id], references: [id])
 
-  penempatan_list  PenempatanPegawai[]
   sk_list          Sk[]
   ro_list          Ro[]
   dana_operasional DanaOperasional[]
@@ -147,7 +146,6 @@ model Pegawai {
 
   kepala_dari UnitKerja[] @relation("KepalaUnit")
 
-  penempatan_list PenempatanPegawai[]
   sk_list         Sk[]
   alokasi_list    AlokasiGajiTA[]
   user_akun       User?
@@ -157,34 +155,7 @@ model Pegawai {
   @@map("pegawai")
 }
 
-// ─── 3b. PENEMPATAN PEGAWAI (HOMEBASE HISTORY) ─────────────────────────────
-
-model PenempatanPegawai {
-  id            String      @id @default(uuid()) @db.Uuid
-  pegawai_id    String      @db.Uuid
-  unit_kerja_id String      @db.Uuid
-  jabatan       String?     @db.VarChar(150)
-  tmt           DateTime    @db.Date
-  tanggal_selesai DateTime? @db.Date
-  no_sk         String?     @db.VarChar(100)
-  file_sk       String?     @db.VarChar(500)
-  status_aktif  StatusAktif @default(AKTIF)
-  is_homebase   Boolean     @default(true)
-  keterangan    String?     @db.VarChar(256)
-  created_at    DateTime    @default(now())
-  updated_at    DateTime    @updatedAt
-
-  pegawai    Pegawai   @relation(fields: [pegawai_id], references: [id], onDelete: Cascade)
-  unit_kerja UnitKerja @relation(fields: [unit_kerja_id], references: [id])
-
-  @@index([pegawai_id])
-  @@index([unit_kerja_id])
-  @@index([status_aktif])
-  @@index([is_homebase])
-  @@map("penempatan_pegawai")
-}
-
-// ─── 4. SK (SURAT KEPUTUSAN PENUGASAN) ─────────────────────────────────────
+// ─── 4. SK (SURAT KEPUTUSAN PENUGASAN — Single Source of Truth) ────────────
 
 model Sk {
   id              String      @id @default(uuid()) @db.Uuid
@@ -200,6 +171,8 @@ model Sk {
   sumber_dana_default         SumberDana? @default(OPERASIONAL)
   ro_id_default               String?     @db.Uuid
   dana_operasional_id_default String?     @db.Uuid
+  is_homebase     Boolean     @default(true)
+  keterangan      String?     @db.VarChar(255)
   status_aktif    StatusAktif @default(AKTIF)
   created_at      DateTime    @default(now())
   updated_at      DateTime    @updatedAt
@@ -211,6 +184,7 @@ model Sk {
 
   @@index([pegawai_id])
   @@index([status_aktif])
+  @@index([is_homebase])
   @@index([tanggal_selesai])
   @@map("sk")
 }

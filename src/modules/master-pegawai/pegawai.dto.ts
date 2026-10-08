@@ -103,11 +103,6 @@ export class CreatePegawaiDto {
   @IsEnum(TaKategori)
   @IsOptional()
   ta_kategori?: TaKategori;
-
-  @ApiPropertyOptional({ description: 'Unit kerja aktif' })
-  @IsUUID()
-  @IsOptional()
-  id_unit_kerja?: string;
 }
 
 export class UpdatePegawaiDto {
@@ -165,11 +160,6 @@ export class UpdatePegawaiDto {
   @IsEnum(TaKategori)
   @IsOptional()
   ta_kategori?: TaKategori;
-
-  @ApiPropertyOptional()
-  @IsUUID()
-  @IsOptional()
-  id_unit_kerja?: string;
 }
 
 // ─── RESPONSE ───────────────────────────────────────────────────────────────
@@ -276,129 +266,7 @@ export class SkRiwayatItemDto {
   unit_kerja?: UnitKerjaRingkasDto;
 }
 
-export class PenempatanItemDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty()
-  pegawai_id: string;
-
-  @ApiProperty({ type: UnitKerjaRingkasDto })
-  unit_kerja: UnitKerjaRingkasDto;
-
-  @ApiPropertyOptional({ nullable: true })
-  jabatan?: string | null;
-
-  @ApiProperty()
-  tmt: Date;
-
-  @ApiPropertyOptional({ nullable: true })
-  tanggal_selesai?: Date | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  no_sk?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  file_sk?: string | null;
-
-  @ApiProperty()
-  status_aktif: string;
-
-  @ApiProperty()
-  is_homebase: boolean;
-
-  @ApiPropertyOptional({ nullable: true })
-  keterangan?: string | null;
-
-  @ApiProperty()
-  created_at: Date;
-}
-
-export class CreatePenempatanDto {
-  @ApiProperty({ description: 'Unit kerja tujuan' })
-  @IsUUID()
-  unit_kerja_id: string;
-
-  @ApiPropertyOptional({ example: 'Analis Migas' })
-  @IsString()
-  @IsOptional()
-  @EmptyToUndefined()
-  jabatan?: string;
-
-  @ApiProperty({ example: '2024-01-01' })
-  @IsDateString()
-  tmt: string;
-
-  @ApiPropertyOptional({ example: '2025-12-31' })
-  @IsDateString()
-  @IsOptional()
-  tanggal_selesai?: string;
-
-  @ApiPropertyOptional({ example: 'SK/001/2024' })
-  @IsString()
-  @IsOptional()
-  @EmptyToUndefined()
-  no_sk?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @EmptyToUndefined()
-  keterangan?: string;
-
-  @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  is_homebase?: boolean;
-}
-
-export class UpdatePenempatanDto {
-  @ApiPropertyOptional()
-  @IsUUID()
-  @IsOptional()
-  unit_kerja_id?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @EmptyToUndefined()
-  jabatan?: string;
-
-  @ApiPropertyOptional()
-  @IsDateString()
-  @IsOptional()
-  tmt?: string;
-
-  @ApiPropertyOptional()
-  @IsDateString()
-  @IsOptional()
-  tanggal_selesai?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @EmptyToUndefined()
-  no_sk?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  @EmptyToUndefined()
-  keterangan?: string;
-
-  @ApiPropertyOptional({ enum: StatusAktif })
-  @IsEnum(StatusAktif)
-  @IsOptional()
-  status_aktif?: StatusAktif;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  is_homebase?: boolean;
-}
-
 export class PegawaiDetailDto extends PegawaiItemDto {
   @ApiProperty({ type: [SkRiwayatItemDto] })
   riwayat_sk: SkRiwayatItemDto[];
-
-  @ApiProperty({ type: [PenempatanItemDto] })
-  riwayat_penempatan: PenempatanItemDto[];
 }

@@ -73,20 +73,6 @@ export class PegawaiPostController {
       },
     });
 
-    if (body.id_unit_kerja) {
-      await this.prisma.penempatanPegawai.create({
-        data: {
-          pegawai_id: pegawai.id,
-          unit_kerja_id: body.id_unit_kerja,
-          jabatan: body.jabatan ?? null,
-          tmt: new Date(body.tanggal_mulai),
-          status_aktif: 'AKTIF',
-          is_homebase: true,
-          keterangan: 'Homebase',
-        },
-      });
-    }
-
     await this.audit.log({
       tabel: 'pegawai',
       recordId: pegawai.id,

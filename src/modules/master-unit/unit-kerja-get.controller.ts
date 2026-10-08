@@ -69,7 +69,7 @@ export class UnitKerjaGetController {
           kepala_unit: { select: { nama: true } },
           _count: {
             select: {
-              penempatan_list: {
+              sk_list: {
                 where: { status_aktif: 'AKTIF', is_homebase: true },
               },
               children: { where: { status_aktif: 'AKTIF' } },
@@ -93,7 +93,7 @@ export class UnitKerjaGetController {
       kepala_unit_nama: u.kepala_unit?.nama ?? null,
       deskripsi: u.deskripsi ?? null,
       status_aktif: u.status_aktif,
-      jumlah_pegawai_aktif: (u._count as any).penempatan_list,
+      jumlah_pegawai_aktif: (u._count as any).sk_list,
       jumlah_sub_unit: u._count.children,
       created_at: u.created_at,
       updated_at: u.updated_at,

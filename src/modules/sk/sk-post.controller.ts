@@ -70,30 +70,58 @@ export class SkPostController {
       filePath = await this.fileService.uploadSk(file as any);
     }
 
-    // Buat SK (default NONAKTIF — diaktifkan via endpoint activate)
-    const sk = await this.prisma.sk.create({
-      data: {
-        nomor_sk: body.nomor_sk,
-        tanggal_sk: new Date(body.tanggal_sk),
-        tanggal_efektif: new Date(body.tanggal_efektif),
-        tanggal_selesai: body.tanggal_selesai
-          ? new Date(body.tanggal_selesai)
-          : null,
-        pegawai_id: body.id_pegawai,
-        unit_kerja_id: body.id_unit_kerja,
-        jabatan: body.jabatan ?? null,
-        file_sk: filePath,
-        gaji_bulanan: body.gaji_bulanan ?? 0,
-        sumber_dana_default: (body as any).sumber_dana_default ?? 'OPERASIONAL',
-        ro_id_default: (body as any).ro_id_default ?? null,
-        dana_operasional_id_default:
-          (body as any).dana_operasional_id_default ?? null,
-        status_aktif: 'NONAKTIF',
-      },
-      include: {
-        pegawai: { select: { id: true, nama: true, nip_nik: true } },
-        unit_kerja: { select: { id: true, nama_unit: true } },
-      },
+    const isTugasTambahan =
+      (body as any).is_tugas_tambahan === true ||
+      (body as any).is_tugas_tambahan === 'true';
+
+    const sk = await this.prisma.$transaction(async (tx) => {
+      const tanggalEfektif = new Date(body.tanggal_efektif);
+
+      if (!isTugasTambahan) {
+        const activeHomebase = await tx.sk.findFirst({
+          where: {
+            pegawai_id: body.id_pegawai,
+            is_homebase: true,
+            status_aktif: 'AKTIF',
+          },
+        });
+        if (activeHomebase) {
+          const hMin1 = new Date(tanggalEfektif);
+          hMin1.setDate(hMin1.getDate() - 1);
+          await tx.sk.update({
+            where: { id: activeHomebase.id },
+            data: { status_aktif: 'NONAKTIF', tanggal_selesai: hMin1 },
+          });
+        }
+      }
+
+      return tx.sk.create({
+        data: {
+          nomor_sk: body.nomor_sk,
+          tanggal_sk: new Date(body.tanggal_sk),
+          tanggal_efektif: tanggalEfektif,
+          tanggal_selesai: body.tanggal_selesai
+            ? new Date(body.tanggal_selesai)
+            : null,
+          pegawai_id: body.id_pegawai,
+          unit_kerja_id: body.id_unit_kerja,
+          jabatan: body.jabatan ?? null,
+          file_sk: filePath,
+          gaji_bulanan: body.gaji_bulanan ?? 0,
+          sumber_dana_default:
+            (body as any).sumber_dana_default ?? 'OPERASIONAL',
+          ro_id_default: (body as any).ro_id_default ?? null,
+          dana_operasional_id_default:
+            (body as any).dana_operasional_id_default ?? null,
+          is_homebase: !isTugasTambahan,
+          keterangan: (body as any).keterangan ?? null,
+          status_aktif: 'AKTIF',
+        },
+        include: {
+          pegawai: { select: { id: true, nama: true, nip_nik: true } },
+          unit_kerja: { select: { id: true, nama_unit: true } },
+        },
+      });
     });
 
     await this.audit.log({
@@ -104,25 +132,29 @@ export class SkPostController {
       dataSesudah: sk,
     });
 
-    return created(
-      'Berhasil menambahkan SK. Gunakan endpoint activate untuk mengaktifkan.',
-      {
-        id: sk.id,
-        nomor_sk: sk.nomor_sk,
-        tanggal_sk: sk.tanggal_sk,
-        tanggal_efektif: sk.tanggal_efektif,
-        tanggal_selesai: sk.tanggal_selesai ?? null,
-        jabatan: sk.jabatan ?? null,
-        file_sk: sk.file_sk ?? null,
-        status_aktif: sk.status_aktif,
-        id_pegawai: sk.pegawai?.id ?? null,
-        nama_pegawai: sk.pegawai?.nama ?? null,
-        nip_nik: sk.pegawai?.nip_nik ?? null,
-        id_unit_kerja: sk.unit_kerja?.id ?? null,
-        nama_unit_kerja: sk.unit_kerja?.nama_unit ?? null,
-        created_at: sk.created_at,
-        updated_at: sk.updated_at,
-      },
-    );
+    return created('Berhasil menambahkan SK', {
+      id: sk.id,
+      nomor_sk: sk.nomor_sk,
+      tanggal_sk: sk.tanggal_sk,
+      tanggal_efektif: sk.tanggal_efektif,
+      tanggal_selesai: (sk as any).tanggal_selesai ?? null,
+      jabatan: (sk as any).jabatan ?? null,
+      file_sk: (sk as any).file_sk ?? null,
+      gaji_bulanan: (sk as any).gaji_bulanan ?? null,
+      sumber_dana_default: (sk as any).sumber_dana_default ?? null,
+      ro_id_default: (sk as any).ro_id_default ?? null,
+      dana_operasional_id_default:
+        (sk as any).dana_operasional_id_default ?? null,
+      is_homebase: (sk as any).is_homebase,
+      keterangan: (sk as any).keterangan ?? null,
+      status_aktif: sk.status_aktif,
+      id_pegawai: (sk as any).pegawai?.id ?? null,
+      nama_pegawai: (sk as any).pegawai?.nama ?? null,
+      nip_nik: (sk as any).pegawai?.nip_nik ?? null,
+      id_unit_kerja: (sk as any).unit_kerja?.id ?? null,
+      nama_unit_kerja: (sk as any).unit_kerja?.nama_unit ?? null,
+      created_at: (sk as any).created_at,
+      updated_at: (sk as any).updated_at,
+    });
   }
 }
