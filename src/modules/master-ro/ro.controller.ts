@@ -154,6 +154,9 @@ export class RoController {
     });
     return ok('Berhasil mengambil detail RO', {
       ...this.mapItem(ro, balance.total_terpakai),
+      alokasi_terpakai: (balance as any).alokasi_terpakai ?? 0,
+      trx_debit: (balance as any).trx_debit ?? ledger.total_debit,
+      trx_kredit: (balance as any).trx_kredit ?? ledger.total_kredit,
       transaksi_list: ledger.list,
       total_debit: ledger.total_debit,
       total_kredit: ledger.total_kredit,
