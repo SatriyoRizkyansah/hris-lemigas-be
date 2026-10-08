@@ -21,20 +21,23 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RekapItemDto } from './alokasi-gaji.dto.js';
+import { ApiStandartResponseArray } from '../../other/scheme_standar.js';
 
 class RekapQueryDto {
   @ApiPropertyOptional({ example: 1, minimum: 1, maximum: 12 })
   @IsInt()
   @Min(1)
   @Max(12)
+  @IsOptional()
   @Type(() => Number)
-  periode_bulan: number;
+  periode_bulan?: number;
 
   @ApiPropertyOptional({ example: 2026 })
   @IsInt()
   @Min(2000)
+  @IsOptional()
   @Type(() => Number)
-  periode_tahun: number;
+  periode_tahun?: number;
 
   @ApiPropertyOptional({ description: 'Filter unit (termasuk anak unit)' })
   @IsUUID()
@@ -56,6 +59,7 @@ export class AlokasiRekapController {
     Role.Superadmin,
     Role.Koordinator,
   ])
+  @ApiStandartResponseArray(RekapItemDto)
   async getRekap(
     @CurrentUser() user: JwtPayload,
     @Query() query: RekapQueryDto,
@@ -92,8 +96,8 @@ export class AlokasiRekapController {
         },
         alokasi_list: {
           where: {
-            periode_bulan,
-            periode_tahun,
+            ...(periode_bulan !== undefined ? { periode_bulan } : {}),
+            ...(periode_tahun !== undefined ? { periode_tahun } : {}),
             status: 'AKTIF',
           },
           include: {
@@ -195,7 +199,11 @@ export class AlokasiRekapController {
           take: 1,
         },
         alokasi_list: {
-          where: { periode_bulan, periode_tahun, status: 'AKTIF' },
+          where: {
+            ...(periode_bulan !== undefined ? { periode_bulan } : {}),
+            ...(periode_tahun !== undefined ? { periode_tahun } : {}),
+            status: 'AKTIF',
+          },
           include: {
             ro: { select: { kode_ro: true, nama_ro: true } },
           },
