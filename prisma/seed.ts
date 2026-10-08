@@ -423,7 +423,6 @@ async function main() {
         tipe_pegawai: p.tipe,
         jabatan: p.jabatan,
         email: p.email,
-        gaji_bulanan: p.gaji,
         bidang_keahlian: p.bidang ?? null,
       },
       create: {
@@ -433,7 +432,6 @@ async function main() {
         jabatan: p.jabatan,
         email: p.email,
         tanggal_mulai: new Date('2026-01-01'),
-        gaji_bulanan: p.gaji,
         bidang_keahlian: p.bidang ?? null,
         ...(p.tipe === 'TA'
           ? {
@@ -490,8 +488,18 @@ async function main() {
           pegawai_id: pegawaiId,
           unit_kerja_id: p.unitId,
           jabatan: p.jabatan,
+          gaji_bulanan: p.gaji,
+          sumber_dana_default: 'OPERASIONAL',
           status_aktif: 'AKTIF',
         },
+      });
+    } else if (
+      (existingSk as any).gaji_bulanan === 0 ||
+      (existingSk as any).gaji_bulanan == null
+    ) {
+      await prisma.sk.update({
+        where: { id: existingSk.id },
+        data: { gaji_bulanan: p.gaji },
       });
     }
     await prisma.pegawai.update({

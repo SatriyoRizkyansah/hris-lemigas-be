@@ -2,11 +2,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsDateString,
   IsEnum,
-  IsInt,
   IsOptional,
   IsString,
   IsUUID,
-  Min,
 } from 'class-validator';
 import {
   TipePegawai,
@@ -98,15 +96,6 @@ export class CreatePegawaiDto {
   kontrak_selesai?: string;
 
   @ApiPropertyOptional({
-    example: 15000000,
-    description: 'Gaji/honorarium bulanan dalam Rupiah (integer)',
-  })
-  @IsInt()
-  @Min(0)
-  @IsOptional()
-  gaji_bulanan?: number;
-
-  @ApiPropertyOptional({
     enum: TaKategori,
     default: TaKategori.BIASA,
     description: 'Kategori TA: BIASA atau RO',
@@ -171,12 +160,6 @@ export class UpdatePegawaiDto {
   @IsDateString()
   @IsOptional()
   kontrak_selesai?: string;
-
-  @ApiPropertyOptional({ example: 15000000 })
-  @IsInt()
-  @Min(0)
-  @IsOptional()
-  gaji_bulanan?: number;
 
   @ApiPropertyOptional({ enum: TaKategori })
   @IsEnum(TaKategori)
@@ -248,11 +231,11 @@ export class PegawaiItemDto {
   @ApiPropertyOptional({ nullable: true })
   kontrak_selesai?: Date | null;
 
-  @ApiPropertyOptional({ nullable: true })
-  gaji_bulanan?: number | null;
-
   @ApiPropertyOptional()
   ta_kategori?: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  gaji_bulanan?: number | null;
 
   @ApiPropertyOptional({ type: UnitKerjaRingkasDto, nullable: true })
   unit_kerja?: UnitKerjaRingkasDto | null;

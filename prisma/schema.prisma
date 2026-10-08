@@ -140,7 +140,6 @@ model Pegawai {
   bidang_keahlian String?    @db.VarChar(150)
   kontrak_mulai   DateTime?  @db.Date
   kontrak_selesai DateTime?  @db.Date
-  gaji_bulanan    Int        @default(0)
   ta_kategori     TaKategori @default(BIASA)
 
   created_at DateTime @default(now())
@@ -197,15 +196,22 @@ model Sk {
   unit_kerja_id   String      @db.Uuid
   jabatan         String?     @db.VarChar(150)
   file_sk         String?     @db.VarChar(500)
+  gaji_bulanan    Int         @default(0)
+  sumber_dana_default         SumberDana? @default(OPERASIONAL)
+  ro_id_default               String?     @db.Uuid
+  dana_operasional_id_default String?     @db.Uuid
   status_aktif    StatusAktif @default(AKTIF)
   created_at      DateTime    @default(now())
   updated_at      DateTime    @updatedAt
 
-  pegawai    Pegawai   @relation(fields: [pegawai_id], references: [id])
-  unit_kerja UnitKerja @relation(fields: [unit_kerja_id], references: [id])
+  pegawai     Pegawai         @relation(fields: [pegawai_id], references: [id])
+  unit_kerja  UnitKerja       @relation(fields: [unit_kerja_id], references: [id])
+  ro_default  Ro?             @relation("SkRoDefault", fields: [ro_id_default], references: [id])
+  dana_default DanaOperasional? @relation("SkDanaDefault", fields: [dana_operasional_id_default], references: [id])
 
   @@index([pegawai_id])
   @@index([status_aktif])
+  @@index([tanggal_selesai])
   @@map("sk")
 }
 
@@ -249,6 +255,7 @@ model Ro {
 
   alokasi_list   AlokasiGajiTA[]
   transaksi_list RoTransaksi[]
+  sk_default_list Sk[] @relation("SkRoDefault")
 
   @@index([proyek_id])
   @@index([unit_koordinator_id])
@@ -289,6 +296,7 @@ model DanaOperasional {
 
   alokasi_list     AlokasiGajiTA[]
   transaksi_list   DanaTransaksi[]
+  sk_default_list  Sk[] @relation("SkDanaDefault")
 
   @@unique([unit_koordinator_id, tahun_fiscal])
   @@map("dana_operasional")

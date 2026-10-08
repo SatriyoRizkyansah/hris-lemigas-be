@@ -7,9 +7,12 @@ import {
   Param,
   ParseUUIDPipe,
   Put,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma.module.js';
 import { ApiStandartResponse } from '../../other/scheme_standar.js';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard.js';
@@ -19,6 +22,7 @@ import { CurrentUser } from '../../auth/user.decorator.js';
 import type { JwtPayload } from '../../auth/user.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { AuditService } from '../../common/services/audit.service.js';
+import { FileService } from '../../common/services/file.service.js';
 import { AksiAudit } from '../../common/enums/hris.enum.js';
 import { ok } from '../../common/utils/response.util.js';
 import { UpdateSkDto, ActivateSkDto, SkItemDto } from './sk.dto.js';
@@ -30,15 +34,20 @@ export class SkPutController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly fileService: FileService,
   ) {}
 
   @Put(':id')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: UpdateSkDto })
   @ApiRoles('Update SK', [Role.Superadmin])
   @ApiStandartResponse(SkItemDto)
   async update(
     @CurrentUser() user: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateSkDto,
+    @UploadedFile() file?: any,
   ) {
     const existing = await this.prisma.sk.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('SK tidak ditemukan');
@@ -61,6 +70,13 @@ export class SkPutController {
       if (!unit) throw new BadRequestException('Unit kerja tidak ditemukan');
     }
 
+    let filePath: string | undefined;
+    if (file) {
+      filePath = await this.fileService.uploadSk(file as any);
+    } else if (body.file_sk !== undefined) {
+      filePath = body.file_sk ?? undefined;
+    }
+
     const sk = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.sk.update({
         where: { id },
@@ -81,7 +97,20 @@ export class SkPutController {
             unit_kerja_id: body.id_unit_kerja,
           }),
           ...(body.jabatan !== undefined && { jabatan: body.jabatan }),
-          ...(body.file_sk !== undefined && { file_sk: body.file_sk }),
+          ...(filePath !== undefined && { file_sk: filePath }),
+          ...(body.gaji_bulanan !== undefined && {
+            gaji_bulanan: body.gaji_bulanan,
+          }),
+          ...((body as any).sumber_dana_default !== undefined && {
+            sumber_dana_default: (body as any).sumber_dana_default,
+          }),
+          ...((body as any).ro_id_default !== undefined && {
+            ro_id_default: (body as any).ro_id_default,
+          }),
+          ...((body as any).dana_operasional_id_default !== undefined && {
+            dana_operasional_id_default: (body as any)
+              .dana_operasional_id_default,
+          }),
         },
         include: {
           pegawai: { select: { id: true, nama: true, nip_nik: true } },

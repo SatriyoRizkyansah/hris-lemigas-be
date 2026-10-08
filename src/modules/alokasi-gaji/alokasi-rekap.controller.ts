@@ -86,6 +86,12 @@ export class AlokasiRekapController {
           select: { unit_kerja: { select: { id: true, nama_unit: true } } },
           take: 1,
         },
+        sk_list: {
+          where: { status_aktif: 'AKTIF' },
+          select: { gaji_bulanan: true },
+          orderBy: { tanggal_efektif: 'desc' },
+          take: 1,
+        },
         alokasi_list: {
           where: {
             periode_bulan,
@@ -102,6 +108,7 @@ export class AlokasiRekapController {
     });
 
     const data: RekapItemDto[] = pegawais.map((pegawai: any) => {
+      const gaji_bulanan = pegawai.sk_list?.[0]?.gaji_bulanan ?? 0;
       const total_alokasi = pegawai.alokasi_list.reduce(
         (acc: number, a: any) => acc + a.jumlah,
         0,
@@ -119,11 +126,11 @@ export class AlokasiRekapController {
         nama_pegawai: pegawai.nama,
         nip_nik: pegawai.nip_nik,
         nama_unit_kerja: uk?.nama_unit ?? null,
-        gaji_bulanan: pegawai.gaji_bulanan,
+        gaji_bulanan,
         total_alokasi,
         alokasi_ro,
         alokasi_operasional,
-        sisa_gaji: pegawai.gaji_bulanan - total_alokasi,
+        sisa_gaji: gaji_bulanan - total_alokasi,
         detail: pegawai.alokasi_list.map((a: any) => ({
           id: a.id,
           periode_bulan: a.periode_bulan,
@@ -183,6 +190,12 @@ export class AlokasiRekapController {
         penempatan_list: {
           where: { is_homebase: true, status_aktif: 'AKTIF' },
           select: { unit_kerja: { select: { nama_unit: true } } },
+          take: 1,
+        },
+        sk_list: {
+          where: { status_aktif: 'AKTIF' },
+          select: { gaji_bulanan: true },
+          orderBy: { tanggal_efektif: 'desc' },
           take: 1,
         },
         alokasi_list: {
@@ -248,6 +261,7 @@ export class AlokasiRekapController {
     let no = 1;
     let grandTotal = 0;
     for (const pegawai of pegawais) {
+      const gaji = (pegawai as any).sk_list?.[0]?.gaji_bulanan ?? 0;
       const total_alokasi = pegawai.alokasi_list.reduce(
         (acc, a) => acc + a.jumlah,
         0,
@@ -266,17 +280,20 @@ export class AlokasiRekapController {
         nama: pegawai.nama,
         unit:
           (pegawai as any).penempatan_list?.[0]?.unit_kerja?.nama_unit ?? '-',
-        gaji: pegawai.gaji_bulanan,
+        gaji,
         alokasi_ro,
         alokasi_operasional,
         total: total_alokasi,
-        sisa: pegawai.gaji_bulanan - total_alokasi,
+        sisa: gaji - total_alokasi,
       });
     }
 
     const totalRow = sheet.addRow({
       nama: 'TOTAL',
-      gaji: pegawais.reduce((acc, p) => acc + p.gaji_bulanan, 0),
+      gaji: pegawais.reduce(
+        (acc, p) => acc + ((p as any).sk_list?.[0]?.gaji_bulanan ?? 0),
+        0,
+      ),
       alokasi_ro: pegawais.reduce(
         (acc, p) =>
           acc +

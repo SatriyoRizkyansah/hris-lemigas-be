@@ -1,14 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsDateString,
+  IsEnum,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
   MaxLength,
+  Min,
 } from 'class-validator';
 import { PaginateQuery } from '../../common/dto/paginate-query.dto.js';
 import { EmptyToUndefined } from '../../common/utils/empty-to-undefined.js';
+import { SumberDana } from '../../common/enums/hris.enum.js';
 
 export class SkQueryDto extends PaginateQuery {
   @ApiPropertyOptional({ description: 'Filter pegawai' })
@@ -73,6 +77,35 @@ export class CreateSkDto {
   @IsOptional()
   @EmptyToUndefined()
   file_sk?: string;
+
+  @ApiPropertyOptional({
+    example: 12000000,
+    description: 'Gaji bulanan per SK',
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  gaji_bulanan?: number;
+
+  @ApiPropertyOptional({
+    enum: SumberDana,
+    description: 'Default sumber dana TA',
+  })
+  @IsEnum(SumberDana)
+  @IsOptional()
+  sumber_dana_default?: SumberDana;
+
+  @ApiPropertyOptional({ description: 'Default RO id jika sumber RO' })
+  @IsUUID()
+  @IsOptional()
+  ro_id_default?: string;
+
+  @ApiPropertyOptional({
+    description: 'Default dana operasional id jika sumber OPERASIONAL',
+  })
+  @IsUUID()
+  @IsOptional()
+  dana_operasional_id_default?: string;
 }
 
 export class UpdateSkDto {
@@ -113,6 +146,27 @@ export class UpdateSkDto {
   @IsOptional()
   @EmptyToUndefined()
   file_sk?: string;
+
+  @ApiPropertyOptional({ example: 12000000 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  gaji_bulanan?: number;
+
+  @ApiPropertyOptional({ enum: SumberDana })
+  @IsEnum(SumberDana)
+  @IsOptional()
+  sumber_dana_default?: SumberDana;
+
+  @ApiPropertyOptional()
+  @IsUUID()
+  @IsOptional()
+  ro_id_default?: string;
+
+  @ApiPropertyOptional()
+  @IsUUID()
+  @IsOptional()
+  dana_operasional_id_default?: string;
 }
 
 export class ActivateSkDto {
@@ -141,6 +195,18 @@ export class SkItemDto {
 
   @ApiPropertyOptional({ nullable: true })
   file_sk?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  gaji_bulanan?: number | null;
+
+  @ApiPropertyOptional({ nullable: true, enum: ['RO', 'OPERASIONAL'] })
+  sumber_dana_default?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  ro_id_default?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  dana_operasional_id_default?: string | null;
 
   @ApiProperty()
   status_aktif: string;

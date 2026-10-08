@@ -110,6 +110,11 @@ export class PegawaiGetController {
             },
             take: 1,
           },
+          sk_list: {
+            where: { status_aktif: 'AKTIF' },
+            select: { gaji_bulanan: true },
+            take: 1,
+          },
         },
         orderBy: { nama: 'asc' },
         skip: (query.page - 1) * query.limit,
@@ -270,7 +275,7 @@ export class PegawaiGetController {
       bidang_keahlian: item.bidang_keahlian ?? null,
       kontrak_mulai: item.kontrak_mulai ?? null,
       kontrak_selesai: item.kontrak_selesai ?? null,
-      gaji_bulanan: item.gaji_bulanan ?? null,
+      gaji_bulanan: item.sk_list?.[0]?.gaji_bulanan ?? null,
       ta_kategori: item.ta_kategori ?? 'BIASA',
       unit_kerja: uk
         ? {

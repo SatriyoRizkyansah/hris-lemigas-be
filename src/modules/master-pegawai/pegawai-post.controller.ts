@@ -69,7 +69,6 @@ export class PegawaiPostController {
         kontrak_selesai: body.kontrak_selesai
           ? new Date(body.kontrak_selesai)
           : null,
-        gaji_bulanan: body.gaji_bulanan ?? 0,
         ta_kategori: (body as any).ta_kategori ?? 'BIASA',
       },
     });

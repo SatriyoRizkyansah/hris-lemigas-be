@@ -73,7 +73,7 @@ export class MyProfileController {
             email: pegawai.email,
             jabatan: pegawai.jabatan,
             tipe_pegawai: pegawai.tipe_pegawai,
-            gaji_bulanan: pegawai.gaji_bulanan,
+            gaji_bulanan: (pegawai as any).sk_list?.[0]?.gaji_bulanan ?? 0,
             status_aktif: pegawai.status_aktif,
             unit_kerja: (pegawai as any).penempatan_list?.[0]?.unit_kerja
               ? {
@@ -158,8 +158,13 @@ export class MyProfileController {
       this.prisma.alokasiGajiTA.count({ where: { pegawai_id: pegawai.id } }),
     ]);
 
+    const gajiAktif = await this.prisma.sk.findFirst({
+      where: { pegawai_id: pegawai.id, status_aktif: 'AKTIF' },
+      select: { gaji_bulanan: true },
+      orderBy: { tanggal_efektif: 'desc' },
+    });
     return ok('Berhasil mengambil riwayat alokasi', {
-      gaji_bulanan: pegawai.gaji_bulanan,
+      gaji_bulanan: gajiAktif?.gaji_bulanan ?? 0,
       alokasi: items.map((a) => ({
         id: a.id,
         periode_bulan: a.periode_bulan,
@@ -186,7 +191,7 @@ export class MyProfileController {
         where: { id: user.sub },
         select: {
           pegawai: {
-            select: { id: true, gaji_bulanan: true, status_aktif: true },
+            select: { id: true, status_aktif: true },
           },
         },
       })

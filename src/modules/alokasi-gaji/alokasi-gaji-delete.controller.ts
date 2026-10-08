@@ -85,30 +85,63 @@ export class AlokasiDeleteController {
       }
     }
 
-    const updated = await this.prisma.alokasiGajiTA.update({
-      where: { id },
-      data: { status: 'DIBATALKAN' },
-      include: {
-        pegawai: {
-          select: {
-            id: true,
-            nama: true,
-            nip_nik: true,
-            tipe_pegawai: true,
-            gaji_bulanan: true,
-            penempatan_list: {
-              where: { is_homebase: true, status_aktif: 'AKTIF' },
-              select: { unit_kerja: { select: { id: true, nama_unit: true } } },
-              take: 1,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const upd = await tx.alokasiGajiTA.update({
+        where: { id },
+        data: { status: 'DIBATALKAN' },
+        include: {
+          pegawai: {
+            select: {
+              id: true,
+              nama: true,
+              nip_nik: true,
+              tipe_pegawai: true,
+              penempatan_list: {
+                where: { is_homebase: true, status_aktif: 'AKTIF' },
+                select: {
+                  unit_kerja: { select: { id: true, nama_unit: true } },
+                },
+                take: 1,
+              },
+              sk_list: {
+                where: { status_aktif: 'AKTIF' },
+                select: { gaji_bulanan: true },
+                take: 1,
+              },
             },
           },
+          ro: { select: { id: true, kode_ro: true, nama_ro: true } },
+          dana_operasional: {
+            select: { id: true, tahun_fiscal: true, unit_koordinator_id: true },
+          },
+          pembuat: { select: { nama: true } },
         },
-        ro: { select: { id: true, kode_ro: true, nama_ro: true } },
-        dana_operasional: {
-          select: { id: true, tahun_fiscal: true, unit_koordinator_id: true },
-        },
-        pembuat: { select: { nama: true } },
-      },
+      });
+      const namaKegiatan = `Refund alokasi gaji TA ${upd.pegawai?.nama ?? upd.pegawai_id} periode ${upd.periode_bulan}/${upd.periode_tahun}`;
+      if (upd.sumber_dana === 'RO' && upd.ro_id) {
+        await tx.roTransaksi.create({
+          data: {
+            ro_id: upd.ro_id,
+            nama_kegiatan: namaKegiatan,
+            tanggal: new Date(),
+            debit: 0,
+            kredit: upd.jumlah,
+            keterangan: `Cancel alokasi ${id}`,
+          },
+        });
+      } else if (upd.sumber_dana === 'OPERASIONAL' && upd.dana_operasional_id) {
+        await tx.danaTransaksi.create({
+          data: {
+            dana_id: upd.dana_operasional_id,
+            nama_kegiatan: namaKegiatan,
+            tanggal: new Date(),
+            debit: 0,
+            kredit: upd.jumlah,
+            keterangan: `Cancel alokasi ${id}`,
+          },
+        });
+      }
+      return upd;
     });
 
     await this.audit.log({

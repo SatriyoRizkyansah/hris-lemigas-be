@@ -124,7 +124,7 @@ export class AlokasiValidationService {
       }
     }
 
-    // Cek total alokasi per TA per periode ≤ gaji bulanan
+    // Cek total alokasi per TA per periode ≤ gaji bulanan (dari SK aktif)
     const where: Record<string, unknown> = {
       pegawai_id: input.pegawaiId,
       periode_bulan: input.periodeBulan,
@@ -138,16 +138,17 @@ export class AlokasiValidationService {
       where,
     });
     const totalExisting = existing._sum.jumlah ?? 0;
+    const gajiBulanan = activeSk.gaji_bulanan ?? 0;
 
-    if (totalExisting + input.jumlah > pegawai.gaji_bulanan) {
+    if (totalExisting + input.jumlah > gajiBulanan) {
       throw new BadRequestException(
         `Total alokasi bulan ${input.periodeBulan}/${input.periodeTahun} ` +
           `(Rp ${(totalExisting + input.jumlah).toLocaleString('id-ID')}) ` +
-          `melebihi gaji bulanan Rp ${pegawai.gaji_bulanan.toLocaleString('id-ID')}. ` +
-          `Sisa kuota Rp ${Math.max(0, pegawai.gaji_bulanan - totalExisting).toLocaleString('id-ID')}`,
+          `melebihi gaji bulanan Rp ${gajiBulanan.toLocaleString('id-ID')} (dari SK aktif ${activeSk.nomor_sk}). ` +
+          `Sisa kuota Rp ${Math.max(0, gajiBulanan - totalExisting).toLocaleString('id-ID')}`,
       );
     }
 
-    return { pegawai, rootKoordinator };
+    return { pegawai, activeSk, rootKoordinator };
   }
 }

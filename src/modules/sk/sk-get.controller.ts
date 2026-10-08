@@ -85,6 +85,67 @@ export class SkGetController {
     );
   }
 
+  @Get('expiring-soon')
+  @ApiRoles('SK hampir habis (30 hari)', [Role.Superadmin, Role.Koordinator])
+  @ApiStandartResponseArrayWithPagination(SkItemDto)
+  async getExpiringSoon(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: SkQueryDto,
+  ) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const in30 = new Date(today);
+    in30.setDate(in30.getDate() + 30);
+
+    const where: Record<string, unknown> = {
+      status_aktif: 'AKTIF',
+      tanggal_selesai: { gte: today, lte: in30 },
+    };
+    if (query.id_pegawai) where.pegawai_id = query.id_pegawai;
+    if (query.id_unit_kerja) where.unit_kerja_id = query.id_unit_kerja;
+    if (query.query) {
+      where.OR = [
+        { nomor_sk: { contains: query.query, mode: 'insensitive' } },
+        { pegawai: { nama: { contains: query.query, mode: 'insensitive' } } },
+      ];
+    }
+    if (user.role === Role.Koordinator) {
+      if (!user.unitKerjaId)
+        return paginated(
+          'Berhasil mengambil SK expiring soon',
+          [],
+          query.page,
+          query.limit,
+          0,
+        );
+      const scopedUnits = await this.unitScope.getScopedUnitIds(
+        user.unitKerjaId,
+      );
+      where.unit_kerja_id = { in: scopedUnits };
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.sk.findMany({
+        where,
+        include: {
+          pegawai: { select: { id: true, nama: true, nip_nik: true } },
+          unit_kerja: { select: { id: true, nama_unit: true } },
+        },
+        orderBy: { tanggal_selesai: 'asc' },
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.sk.count({ where }),
+    ]);
+    return paginated(
+      'Berhasil mengambil SK yang hampir habis',
+      items.map((sk) => this.mapItem(sk)),
+      query.page,
+      query.limit,
+      total,
+    );
+  }
+
   @Get('pegawai/:pegawaiId')
   @ApiRoles('Get riwayat SK pegawai', [Role.Superadmin, Role.Koordinator])
   @ApiStandartResponseArrayWithPagination(SkItemDto)
@@ -159,6 +220,10 @@ export class SkGetController {
       tanggal_selesai: sk.tanggal_selesai ?? null,
       jabatan: sk.jabatan ?? null,
       file_sk: sk.file_sk ?? null,
+      gaji_bulanan: sk.gaji_bulanan ?? 0,
+      sumber_dana_default: sk.sumber_dana_default ?? null,
+      ro_id_default: sk.ro_id_default ?? null,
+      dana_operasional_id_default: sk.dana_operasional_id_default ?? null,
       status_aktif: sk.status_aktif,
       id_pegawai: sk.pegawai?.id ?? null,
       nama_pegawai: sk.pegawai?.nama ?? null,

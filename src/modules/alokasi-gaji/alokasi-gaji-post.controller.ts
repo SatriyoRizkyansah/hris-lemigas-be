@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ForbiddenException,
   Controller,
@@ -80,48 +81,128 @@ export class AlokasiPostController {
       jumlah: body.jumlah,
     });
 
-    // Validasi saldo sumber dana
-    await this.fund.assertSufficientBalance({
-      sumberDana: body.sumber_dana,
-      roId: body.id_ro ?? null,
-      danaOperasionalId: body.id_dana_operasional ?? null,
-      jumlah: body.jumlah,
-    });
+    // Atomic create + ledger debit via $transaction
+    const alokasi = await this.prisma.$transaction(async (tx) => {
+      // Re-validate balance inside transaction using tx
+      if (body.sumber_dana === 'RO') {
+        if (!body.id_ro)
+          throw new BadRequestException('RO wajib diisi untuk sumber RO');
+        const ro = await tx.ro.findUnique({ where: { id: body.id_ro } });
+        if (!ro) throw new BadRequestException('RO tidak ditemukan');
+        const terpakai = await tx.alokasiGajiTA.aggregate({
+          _sum: { jumlah: true },
+          where: { ro_id: body.id_ro, status: 'AKTIF' },
+        });
+        const sisa = ro.total_plafon - (terpakai._sum.jumlah ?? 0);
+        if (body.jumlah > sisa) {
+          throw new BadRequestException(
+            `Saldo RO ${ro.kode_ro} tidak mencukupi. Sisa Rp ${sisa.toLocaleString('id-ID')}, alokasi Rp ${body.jumlah.toLocaleString('id-ID')}`,
+          );
+        }
+      } else {
+        if (!body.id_dana_operasional)
+          throw new BadRequestException('Dana operasional wajib diisi');
+        const dana = await tx.danaOperasional.findUnique({
+          where: { id: body.id_dana_operasional },
+        });
+        if (!dana)
+          throw new BadRequestException('Dana operasional tidak ditemukan');
+        const terpakai = await tx.alokasiGajiTA.aggregate({
+          _sum: { jumlah: true },
+          where: {
+            dana_operasional_id: body.id_dana_operasional,
+            status: 'AKTIF',
+          },
+        });
+        const sisa = dana.total_plafon - (terpakai._sum.jumlah ?? 0);
+        if (body.jumlah > sisa) {
+          throw new BadRequestException(
+            `Saldo dana operasional tidak mencukupi. Sisa Rp ${sisa.toLocaleString('id-ID')}, alokasi Rp ${body.jumlah.toLocaleString('id-ID')}`,
+          );
+        }
+      }
 
-    const alokasi = await this.prisma.alokasiGajiTA.create({
-      data: {
-        pegawai_id: body.id_pegawai,
-        periode_bulan: body.periode_bulan,
-        periode_tahun: body.periode_tahun,
-        sumber_dana: body.sumber_dana,
-        ro_id: body.id_ro ?? null,
-        dana_operasional_id: body.id_dana_operasional ?? null,
-        jumlah: body.jumlah,
-        keterangan: body.keterangan ?? null,
-        dibuat_oleh: user.sub,
-      },
-      include: {
-        pegawai: {
-          select: {
-            id: true,
-            nama: true,
-            nip_nik: true,
-            tipe_pegawai: true,
-            gaji_bulanan: true,
-            penempatan_list: {
-              where: { is_homebase: true, status_aktif: 'AKTIF' },
-              select: { unit_kerja: { select: { id: true, nama_unit: true } } },
-              take: 1,
+      const created = await tx.alokasiGajiTA.create({
+        data: {
+          pegawai_id: body.id_pegawai,
+          periode_bulan: body.periode_bulan,
+          periode_tahun: body.periode_tahun,
+          sumber_dana: body.sumber_dana,
+          ro_id: body.id_ro ?? null,
+          dana_operasional_id: body.id_dana_operasional ?? null,
+          jumlah: body.jumlah,
+          keterangan: body.keterangan ?? null,
+          dibuat_oleh: user.sub,
+        },
+      });
+
+      const pegawaiForLedger = await tx.pegawai.findUnique({
+        where: { id: body.id_pegawai },
+        select: { nama: true },
+      });
+      const namaKegiatan = `Alokasi gaji TA ${pegawaiForLedger?.nama ?? body.id_pegawai} periode ${body.periode_bulan}/${body.periode_tahun}`;
+
+      if (body.sumber_dana === 'RO' && body.id_ro) {
+        await tx.roTransaksi.create({
+          data: {
+            ro_id: body.id_ro,
+            nama_kegiatan: namaKegiatan,
+            tanggal: new Date(),
+            debit: body.jumlah,
+            kredit: 0,
+            keterangan: body.keterangan ?? `Alokasi ${created.id}`,
+          },
+        });
+      } else if (
+        body.sumber_dana === 'OPERASIONAL' &&
+        body.id_dana_operasional
+      ) {
+        await tx.danaTransaksi.create({
+          data: {
+            dana_id: body.id_dana_operasional,
+            nama_kegiatan: namaKegiatan,
+            tanggal: new Date(),
+            debit: body.jumlah,
+            kredit: 0,
+            keterangan: body.keterangan ?? `Alokasi ${created.id}`,
+          },
+        });
+      }
+
+      return tx.alokasiGajiTA.findUnique({
+        where: { id: created.id },
+        include: {
+          pegawai: {
+            select: {
+              id: true,
+              nama: true,
+              nip_nik: true,
+              tipe_pegawai: true,
+              penempatan_list: {
+                where: { is_homebase: true, status_aktif: 'AKTIF' },
+                select: {
+                  unit_kerja: { select: { id: true, nama_unit: true } },
+                },
+                take: 1,
+              },
+              sk_list: {
+                where: { status_aktif: 'AKTIF' },
+                select: { gaji_bulanan: true },
+                orderBy: { tanggal_efektif: 'desc' },
+                take: 1,
+              },
             },
           },
+          ro: { select: { id: true, kode_ro: true, nama_ro: true } },
+          dana_operasional: {
+            select: { id: true, tahun_fiscal: true, unit_koordinator_id: true },
+          },
+          pembuat: { select: { nama: true } },
         },
-        ro: { select: { id: true, kode_ro: true, nama_ro: true } },
-        dana_operasional: {
-          select: { id: true, tahun_fiscal: true, unit_koordinator_id: true },
-        },
-        pembuat: { select: { nama: true } },
-      },
+      });
     });
+
+    if (!alokasi) throw new BadRequestException('Gagal membuat alokasi');
 
     await this.audit.log({
       tabel: 'alokasi_gaji_ta',
@@ -147,7 +228,7 @@ export class AlokasiPostController {
       nama_pegawai: item.pegawai?.nama ?? null,
       nip_nik: item.pegawai?.nip_nik ?? null,
       tipe_pegawai: item.pegawai?.tipe_pegawai ?? null,
-      gaji_bulanan: item.pegawai?.gaji_bulanan ?? null,
+      gaji_bulanan: item.pegawai?.sk_list?.[0]?.gaji_bulanan ?? null,
       id_unit_kerja: item.pegawai?.penempatan_list?.[0]?.unit_kerja?.id ?? null,
       nama_unit_kerja:
         item.pegawai?.penempatan_list?.[0]?.unit_kerja?.nama_unit ?? null,

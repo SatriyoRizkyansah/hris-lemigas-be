@@ -98,12 +98,16 @@ export class AlokasiGetController {
               nama: true,
               nip_nik: true,
               tipe_pegawai: true,
-              gaji_bulanan: true,
               penempatan_list: {
                 where: { is_homebase: true, status_aktif: 'AKTIF' },
                 select: {
                   unit_kerja: { select: { id: true, nama_unit: true } },
                 },
+                take: 1,
+              },
+              sk_list: {
+                where: { status_aktif: 'AKTIF' },
+                select: { gaji_bulanan: true },
                 take: 1,
               },
             },
@@ -144,7 +148,7 @@ export class AlokasiGetController {
       nama_pegawai: item.pegawai?.nama ?? null,
       nip_nik: item.pegawai?.nip_nik ?? null,
       tipe_pegawai: item.pegawai?.tipe_pegawai ?? null,
-      gaji_bulanan: item.pegawai?.gaji_bulanan ?? null,
+      gaji_bulanan: item.pegawai?.sk_list?.[0]?.gaji_bulanan ?? null,
       id_unit_kerja: item.pegawai?.penempatan_list?.[0]?.unit_kerja?.id ?? null,
       nama_unit_kerja:
         item.pegawai?.penempatan_list?.[0]?.unit_kerja?.nama_unit ?? null,

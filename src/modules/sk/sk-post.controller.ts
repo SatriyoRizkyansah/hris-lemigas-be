@@ -4,9 +4,12 @@ import {
   ConflictException,
   Controller,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma.module.js';
 import { ApiStandartResponseCreate } from '../../other/scheme_standar.js';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard.js';
@@ -16,6 +19,7 @@ import { CurrentUser } from '../../auth/user.decorator.js';
 import type { JwtPayload } from '../../auth/user.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { AuditService } from '../../common/services/audit.service.js';
+import { FileService } from '../../common/services/file.service.js';
 import { AksiAudit } from '../../common/enums/hris.enum.js';
 import { created } from '../../common/utils/response.util.js';
 import { CreateSkDto, SkItemDto } from './sk.dto.js';
@@ -27,12 +31,20 @@ export class SkPostController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly fileService: FileService,
   ) {}
 
   @Post()
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateSkDto })
   @ApiRoles('Tambah SK', [Role.Superadmin])
   @ApiStandartResponseCreate(SkItemDto)
-  async create(@CurrentUser() user: JwtPayload, @Body() body: CreateSkDto) {
+  async create(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: CreateSkDto,
+    @UploadedFile() file?: any,
+  ) {
     const exists = await this.prisma.sk.findUnique({
       where: { nomor_sk: body.nomor_sk },
     });
@@ -53,6 +65,11 @@ export class SkPostController {
       throw new BadRequestException('Unit kerja tidak aktif');
     }
 
+    let filePath: string | null = body.file_sk ?? null;
+    if (file) {
+      filePath = await this.fileService.uploadSk(file as any);
+    }
+
     // Buat SK (default NONAKTIF — diaktifkan via endpoint activate)
     const sk = await this.prisma.sk.create({
       data: {
@@ -65,7 +82,12 @@ export class SkPostController {
         pegawai_id: body.id_pegawai,
         unit_kerja_id: body.id_unit_kerja,
         jabatan: body.jabatan ?? null,
-        file_sk: body.file_sk ?? null,
+        file_sk: filePath,
+        gaji_bulanan: body.gaji_bulanan ?? 0,
+        sumber_dana_default: (body as any).sumber_dana_default ?? 'OPERASIONAL',
+        ro_id_default: (body as any).ro_id_default ?? null,
+        dana_operasional_id_default:
+          (body as any).dana_operasional_id_default ?? null,
         status_aktif: 'NONAKTIF',
       },
       include: {

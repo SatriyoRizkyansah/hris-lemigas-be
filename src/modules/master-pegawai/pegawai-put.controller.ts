@@ -79,9 +79,6 @@ export class PegawaiPutController {
             ? new Date(body.kontrak_selesai)
             : null,
         }),
-        ...(body.gaji_bulanan !== undefined && {
-          gaji_bulanan: body.gaji_bulanan,
-        }),
         ...((body as any).ta_kategori !== undefined && {
           ta_kategori: (body as any).ta_kategori,
         }),
