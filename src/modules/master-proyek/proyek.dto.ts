@@ -1,14 +1,44 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { PaginateQuery } from '../../common/dto/paginate-query.dto.js';
 import { EmptyToUndefined } from '../../common/utils/empty-to-undefined.js';
+
+export class RoInputDto {
+  @ApiProperty({ example: 'Operasional Pengeboran' })
+  @IsString()
+  @MaxLength(200)
+  nama_ro: string;
+
+  @ApiPropertyOptional({ example: 'RO-2026-001' })
+  @IsString()
+  @IsOptional()
+  @EmptyToUndefined()
+  @Matches(/^[A-Za-z0-9-]+$/, {
+    message: 'kode_ro hanya boleh huruf, angka, dan strip',
+  })
+  @MaxLength(30)
+  kode_ro?: string;
+
+  @ApiProperty({ description: 'ID unit koordinator pemilik RO' })
+  @IsUUID()
+  id_unit_koordinator: string;
+
+  @ApiProperty({ example: 500000000 })
+  @IsInt()
+  @Min(1)
+  plafon: number;
+}
 
 export class ProyekQueryDto extends PaginateQuery {
   @ApiPropertyOptional({ example: 2026 })
@@ -66,6 +96,16 @@ export class CreateProyekDto {
   @Min(0)
   @IsOptional()
   total_margin?: number;
+
+  @ApiPropertyOptional({
+    type: [RoInputDto],
+    description: 'Daftar RO awal — total plafon harus = total_direct_cost',
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RoInputDto)
+  @IsOptional()
+  ro_list?: RoInputDto[];
 }
 
 export class UpdateProyekDto {

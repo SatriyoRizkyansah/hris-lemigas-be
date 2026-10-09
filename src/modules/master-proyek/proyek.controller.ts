@@ -161,7 +161,67 @@ export class ProyekController {
     const nilaiKontrak = body.nilai_kontrak ?? 0;
     const directCost = body.total_direct_cost ?? 0;
 
-    // Atomic: INSERT Proyek + distribute margin via PengaturanMargin
+    if (nilaiKontrak !== directCost + totalMargin) {
+      throw new BadRequestException(
+        `Nilai kontrak (Rp ${nilaiKontrak.toLocaleString('id-ID')}) harus sama dengan Total Direct Cost (Rp ${directCost.toLocaleString('id-ID')}) + Total Margin (Rp ${totalMargin.toLocaleString('id-ID')}) = Rp ${(directCost + totalMargin).toLocaleString('id-ID')}`,
+      );
+    }
+
+    const roList = (body as any).ro_list as
+      | Array<{
+          nama_ro: string;
+          kode_ro?: string;
+          id_unit_koordinator: string;
+          plafon: number;
+        }>
+      | undefined;
+    if (roList && roList.length > 0) {
+      const sumPlafon = roList.reduce((s, r) => s + Number(r.plafon ?? 0), 0);
+      if (sumPlafon !== directCost) {
+        throw new BadRequestException(
+          `Total plafon RO (Rp ${sumPlafon.toLocaleString('id-ID')}) harus sama dengan Total Direct Cost (Rp ${directCost.toLocaleString('id-ID')})`,
+        );
+      }
+      // validate units exist and are KOORDINATOR
+      const unitIds = [...new Set(roList.map((r) => r.id_unit_koordinator))];
+      const units = await this.prisma.unitKerja.findMany({
+        where: { id: { in: unitIds } },
+        select: { id: true, tipe_unit: true },
+      });
+      const unitMap = new Map(units.map((u) => [u.id, u.tipe_unit]));
+      for (const r of roList) {
+        if (!unitMap.has(r.id_unit_koordinator)) {
+          throw new BadRequestException(
+            `Unit koordinator ${r.id_unit_koordinator} tidak ditemukan`,
+          );
+        }
+        if (unitMap.get(r.id_unit_koordinator) !== 'KOORDINATOR') {
+          throw new BadRequestException(
+            'Unit koordinator harus bertipe KOORDINATOR',
+          );
+        }
+      }
+      // validate kode_ro uniqueness if provided
+      const kodeRos = roList.map((r) => r.kode_ro).filter(Boolean) as string[];
+      if (kodeRos.length > 0) {
+        const dup = kodeRos.filter((v, i, a) => a.indexOf(v) !== i);
+        if (dup.length > 0)
+          throw new BadRequestException(
+            `Kode RO duplikat di input: ${dup.join(', ')}`,
+          );
+        const existingKode = await this.prisma.ro.findMany({
+          where: { kode_ro: { in: kodeRos } },
+          select: { kode_ro: true },
+        });
+        if (existingKode.length > 0) {
+          throw new BadRequestException(
+            `Kode RO sudah terdaftar: ${existingKode.map((r) => r.kode_ro).join(', ')}`,
+          );
+        }
+      }
+    }
+
+    // Atomic: INSERT Proyek + bulk RO + distribute margin via PengaturanMargin
     const proyek = await this.prisma.$transaction(async (tx) => {
       const created = await tx.proyek.create({
         data: {
@@ -174,6 +234,24 @@ export class ProyekController {
           total_margin: totalMargin,
         } as any,
       });
+      if (roList && roList.length > 0) {
+        for (let i = 0; i < roList.length; i++) {
+          const r = roList[i];
+          const kodeRo =
+            r.kode_ro?.trim() ||
+            `${body.kode_proyek}-RO-${String(i + 1).padStart(2, '0')}`;
+          await tx.ro.create({
+            data: {
+              kode_ro: kodeRo,
+              nama_ro: r.nama_ro,
+              proyek_id: created.id,
+              unit_koordinator_id: r.id_unit_koordinator,
+              tahun_fiscal: body.tahun_fiscal,
+              total_plafon: r.plafon,
+            } as any,
+          });
+        }
+      }
       if (totalMargin > 0) {
         await this.fundDistribution.distributeMargin(
           created.id,
@@ -208,28 +286,59 @@ export class ProyekController {
     const existing = await this.prisma.proyek.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Proyek tidak ditemukan');
 
-    const proyek = await this.prisma.proyek.update({
-      where: { id },
-      data: {
-        ...(body.nama_proyek !== undefined && {
-          nama_proyek: body.nama_proyek,
-        }),
-        ...(body.tahun_fiscal !== undefined && {
-          tahun_fiscal: body.tahun_fiscal,
-        }),
-        ...(body.sumber_pendanaan !== undefined && {
-          sumber_pendanaan: body.sumber_pendanaan,
-        }),
-        ...(body.nilai_kontrak !== undefined && {
-          nilai_kontrak: body.nilai_kontrak,
-        }),
-        ...(body.total_direct_cost !== undefined && {
-          total_direct_cost: body.total_direct_cost,
-        }),
-        ...(body.total_margin !== undefined && {
-          total_margin: body.total_margin,
-        }),
-      } as any,
+    const nextNilai =
+      body.nilai_kontrak ?? (existing as any).nilai_kontrak ?? 0;
+    const nextDirect =
+      body.total_direct_cost ?? (existing as any).total_direct_cost ?? 0;
+    const nextMargin = body.total_margin ?? (existing as any).total_margin ?? 0;
+    if (nextNilai !== nextDirect + nextMargin) {
+      throw new BadRequestException(
+        `Nilai kontrak (Rp ${nextNilai.toLocaleString('id-ID')}) harus sama dengan Total Direct Cost (Rp ${nextDirect.toLocaleString('id-ID')}) + Total Margin (Rp ${nextMargin.toLocaleString('id-ID')}) = Rp ${(nextDirect + nextMargin).toLocaleString('id-ID')}`,
+      );
+    }
+    // Adendum: if margin increased, distribute delta
+    const oldMargin = (existing as any).total_margin ?? 0;
+    const deltaMargin = nextMargin - oldMargin;
+    if (deltaMargin < 0) {
+      throw new BadRequestException(
+        'Total margin tidak boleh dikurangi (hanya adendum penambahan yang didukung)',
+      );
+    }
+
+    const proyek = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.proyek.update({
+        where: { id },
+        data: {
+          ...(body.nama_proyek !== undefined && {
+            nama_proyek: body.nama_proyek,
+          }),
+          ...(body.tahun_fiscal !== undefined && {
+            tahun_fiscal: body.tahun_fiscal,
+          }),
+          ...(body.sumber_pendanaan !== undefined && {
+            sumber_pendanaan: body.sumber_pendanaan,
+          }),
+          ...(body.nilai_kontrak !== undefined && {
+            nilai_kontrak: body.nilai_kontrak,
+          }),
+          ...(body.total_direct_cost !== undefined && {
+            total_direct_cost: body.total_direct_cost,
+          }),
+          ...(body.total_margin !== undefined && {
+            total_margin: body.total_margin,
+          }),
+        } as any,
+      });
+      if (deltaMargin > 0) {
+        await this.fundDistribution.distributeMargin(
+          id,
+          (body.tahun_fiscal ?? (existing as any).tahun_fiscal) as number,
+          deltaMargin,
+          user.sub,
+          tx as any,
+        );
+      }
+      return updated;
     });
 
     await this.audit.log({

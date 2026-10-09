@@ -238,6 +238,21 @@ export class RoController {
       );
     }
 
+    // Cap: total RO plafon tidak boleh melebihi total_direct_cost proyek (Skenario A/B)
+    const directCost = (proyek as any).total_direct_cost ?? 0;
+    if (directCost > 0) {
+      const agg = await this.prisma.ro.aggregate({
+        where: { proyek_id: body.id_proyek },
+        _sum: { total_plafon: true },
+      });
+      const used = agg._sum.total_plafon ?? 0;
+      if (used + body.total_plafon > directCost) {
+        throw new BadRequestException(
+          `Total plafon RO melebihi Direct Cost proyek. Sisa Direct Cost: Rp ${(directCost - used).toLocaleString('id-ID')} (Direct Cost Rp ${directCost.toLocaleString('id-ID')} - terpakai Rp ${used.toLocaleString('id-ID')}). Kurangi plafon RO lain dulu (Shift Budget) atau lakukan Adendum Proyek.`,
+        );
+      }
+    }
+
     const ro = await this.prisma.ro.create({
       data: {
         kode_ro: body.kode_ro,
@@ -293,6 +308,24 @@ export class RoController {
           `Total plafon baru (Rp ${body.total_plafon.toLocaleString('id-ID')}) ` +
             `tidak boleh kurang dari total terpakai (Rp ${balance.total_terpakai.toLocaleString('id-ID')})`,
         );
+      }
+      // Cap vs proyek direct cost
+      const proyek = await this.prisma.proyek.findUnique({
+        where: { id: existing.proyek_id },
+        select: { total_direct_cost: true },
+      });
+      const directCost = (proyek as any)?.total_direct_cost ?? 0;
+      if (directCost > 0) {
+        const agg = await this.prisma.ro.aggregate({
+          where: { proyek_id: existing.proyek_id, id: { not: id } },
+          _sum: { total_plafon: true },
+        });
+        const otherSum = agg._sum.total_plafon ?? 0;
+        if (otherSum + body.total_plafon > directCost) {
+          throw new BadRequestException(
+            `Total plafon RO melebihi Direct Cost proyek (Rp ${directCost.toLocaleString('id-ID')}). Sisa: Rp ${(directCost - otherSum).toLocaleString('id-ID')}. Kurangi plafon RO lain dulu atau Adendum Proyek.`,
+          );
+        }
       }
     }
 
