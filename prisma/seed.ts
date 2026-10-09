@@ -724,36 +724,42 @@ async function main() {
     },
   });
 
-  // ─── Dana Operasional per koordinator ─────────────────────────────────
-  await prisma.danaOperasional.upsert({
-    where: {
-      unit_koordinator_id_tahun_fiscal_kategori_kamar: {
-        unit_koordinator_id: unitKor1.id,
-        tahun_fiscal: 2026,
-        kategori_kamar: 'LAINNYA',
+  // ─── Dana Operasional — 5 Kamar Margin (realistic wallets for UI dropdowns) ─
+  // unitKor1 = KP3 (testing) → P2_KP3 30jt + OPS_KP3 2.5jt
+  // unitKor3 = Bagian Umum → OPS_KANTOR 17jt
+  // unitKor2 = Kepegawaian → P1_PNS_NON_PNS 48jt
+  // (MULOS_SPI 2.5% akan terisi via distribusi-margin endpoint)
+  const danaWallets: Array<{
+    unitId: string;
+    kategori: 'P1_PNS_NON_PNS' | 'P2_KP3' | 'OPS_KANTOR' | 'OPS_KP3';
+    plafon: number;
+  }> = [
+    { unitId: unitKor1.id, kategori: 'P2_KP3', plafon: 30000000 },
+    { unitId: unitKor1.id, kategori: 'OPS_KP3', plafon: 2500000 },
+    { unitId: unitKor3.id, kategori: 'OPS_KANTOR', plafon: 17000000 },
+    { unitId: unitKor2.id, kategori: 'P1_PNS_NON_PNS', plafon: 48000000 },
+  ];
+  for (const w of danaWallets) {
+    await prisma.danaOperasional.upsert({
+      where: {
+        unit_koordinator_id_tahun_fiscal_kategori_kamar: {
+          unit_koordinator_id: w.unitId,
+          tahun_fiscal: 2026,
+          kategori_kamar: w.kategori,
+        },
       },
-    },
-    update: {},
-    create: {
-      unit_koordinator_id: unitKor1.id,
-      tahun_fiscal: 2026,
-      total_plafon: 100000000,
-    },
-  });
-  await prisma.danaOperasional.upsert({
-    where: {
-      unit_koordinator_id_tahun_fiscal_kategori_kamar: {
-        unit_koordinator_id: unitKor2.id,
+      update: { total_plafon: w.plafon },
+      create: {
+        unit_koordinator_id: w.unitId,
         tahun_fiscal: 2026,
-        kategori_kamar: 'LAINNYA',
+        kategori_kamar: w.kategori,
+        total_plafon: w.plafon,
       },
-    },
-    update: {},
-    create: {
-      unit_koordinator_id: unitKor2.id,
-      tahun_fiscal: 2026,
-      total_plafon: 80000000,
-    },
+    });
+  }
+  // cleanup legacy LAINNYA dummy wallets if they exist
+  await prisma.danaOperasional.deleteMany({
+    where: { tahun_fiscal: 2026, kategori_kamar: 'LAINNYA' },
   });
 
   // ─── Alokasi Gaji TA (5 TA, termasuk satu split 60/40) ────────────────
@@ -766,8 +772,24 @@ async function main() {
   if (!pembuatKor1 || !pembuatKor2)
     throw new Error('User koordinator tidak ditemukan');
 
+  // resolve wallets for alokasi seeding (after kamar wallets created)
+  const danaP2KP3Kor1 = await prisma.danaOperasional.findFirst({
+    where: {
+      unit_koordinator_id: unitKor1.id,
+      tahun_fiscal: 2026,
+      kategori_kamar: 'P2_KP3',
+    },
+  });
+  const danaOpsKantorKor3 = await prisma.danaOperasional.findFirst({
+    where: {
+      unit_koordinator_id: unitKor3.id,
+      tahun_fiscal: 2026,
+      kategori_kamar: 'OPS_KANTOR',
+    },
+  });
+
   const alokasiSeeding = [
-    // TA-001 Andi (unit WK1 → koordinator 1), gaji 4.500.000 — 60% RO + 40% Operasional
+    // TA-001 Andi (unit WK1 → koordinator 1), gaji 4.500.000 — 60% RO + 40% Operasional (P2_KP3)
     {
       pegawaiId: pegawaiMap.get('TA-001')!,
       bulan: 7,
@@ -785,17 +807,9 @@ async function main() {
       tahun: 2026,
       sumber: 'OPERASIONAL' as const,
       roId: null,
-      danaId: (await prisma.danaOperasional.findUnique({
-        where: {
-          unit_koordinator_id_tahun_fiscal_kategori_kamar: {
-            unit_koordinator_id: unitKor1.id,
-            tahun_fiscal: 2026,
-            kategori_kamar: 'LAINNYA',
-          },
-        },
-      }))!.id,
+      danaId: danaP2KP3Kor1!.id,
       jumlah: 1800000,
-      ket: 'Alokasi Operasional 40%',
+      ket: 'Alokasi Operasional 40% (P2_KP3)',
       oleh: pembuatKor1.id,
     },
     // TA-002 Sari (unit WK2 → koordinator 1), gaji 5.000.000 — full RO
@@ -834,24 +848,16 @@ async function main() {
       ket: 'Alokasi RO penuh',
       oleh: pembuatKor2.id,
     },
-    // TA-005 Fajar (unit WK1 → koordinator 1), gaji 3.800.000 — full Operasional
+    // TA-005 Fajar (unit WK1 → koordinator 1), gaji 3.800.000 — full Operasional (P2_KP3)
     {
       pegawaiId: pegawaiMap.get('TA-005')!,
       bulan: 7,
       tahun: 2026,
       sumber: 'OPERASIONAL' as const,
       roId: null,
-      danaId: (await prisma.danaOperasional.findUnique({
-        where: {
-          unit_koordinator_id_tahun_fiscal_kategori_kamar: {
-            unit_koordinator_id: unitKor1.id,
-            tahun_fiscal: 2026,
-            kategori_kamar: 'LAINNYA',
-          },
-        },
-      }))!.id,
+      danaId: danaP2KP3Kor1!.id,
       jumlah: 3800000,
-      ket: 'Alokasi Operasional penuh',
+      ket: 'Alokasi Operasional penuh (P2_KP3)',
       oleh: pembuatKor1.id,
     },
   ];
