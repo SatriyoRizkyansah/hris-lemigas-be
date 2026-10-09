@@ -675,9 +675,10 @@ async function main() {
   // ─── Dana Operasional per koordinator ─────────────────────────────────
   await prisma.danaOperasional.upsert({
     where: {
-      unit_koordinator_id_tahun_fiscal: {
+      unit_koordinator_id_tahun_fiscal_kategori_kamar: {
         unit_koordinator_id: unitKor1.id,
         tahun_fiscal: 2026,
+        kategori_kamar: 'LAINNYA',
       },
     },
     update: {},
@@ -689,9 +690,10 @@ async function main() {
   });
   await prisma.danaOperasional.upsert({
     where: {
-      unit_koordinator_id_tahun_fiscal: {
+      unit_koordinator_id_tahun_fiscal_kategori_kamar: {
         unit_koordinator_id: unitKor2.id,
         tahun_fiscal: 2026,
+        kategori_kamar: 'LAINNYA',
       },
     },
     update: {},
@@ -733,9 +735,10 @@ async function main() {
       roId: null,
       danaId: (await prisma.danaOperasional.findUnique({
         where: {
-          unit_koordinator_id_tahun_fiscal: {
+          unit_koordinator_id_tahun_fiscal_kategori_kamar: {
             unit_koordinator_id: unitKor1.id,
             tahun_fiscal: 2026,
+            kategori_kamar: 'LAINNYA',
           },
         },
       }))!.id,
@@ -788,9 +791,10 @@ async function main() {
       roId: null,
       danaId: (await prisma.danaOperasional.findUnique({
         where: {
-          unit_koordinator_id_tahun_fiscal: {
+          unit_koordinator_id_tahun_fiscal_kategori_kamar: {
             unit_koordinator_id: unitKor1.id,
             tahun_fiscal: 2026,
+            kategori_kamar: 'LAINNYA',
           },
         },
       }))!.id,

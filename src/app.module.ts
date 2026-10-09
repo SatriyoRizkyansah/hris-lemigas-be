@@ -15,6 +15,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { MyProfileModule } from './modules/my-profile/my-profile.module.js';
 import { FileModule } from './modules/file/file.module.js';
+import { FinanceModule } from './modules/finance/finance.module.js';
 import { HealthController } from './health.controller.js';
 
 @Module({
@@ -33,6 +34,7 @@ import { HealthController } from './health.controller.js';
     UsersModule,
     MyProfileModule,
     FileModule,
+    FinanceModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

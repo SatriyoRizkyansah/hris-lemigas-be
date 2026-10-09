@@ -55,6 +55,15 @@ enum AksiAudit {
   CANCEL
 }
 
+enum KategoriKamar {
+  P1_PNS_NON_PNS   // 48% (Kepegawaian/Umum)
+  P2_KP3           // 30% (KP3)
+  OPS_KANTOR       // 17% (Bagian Umum)
+  OPS_KP3          // 2.5% (KP3)
+  MULOS_SPI        // 2.5% (SPI)
+  LAINNYA
+}
+
 // ─── 1. AUTH / USER ────────────────────────────────────────────────────────
 
 model Role {
@@ -263,6 +272,9 @@ model DanaOperasional {
   unit_koordinator_id String   @db.Uuid
   tahun_fiscal        Int
   total_plafon        Int      @default(0)
+  // NEW FIELD – kategori_kamar
+  kategori_kamar   KategoriKamar @default(LAINNYA)
+
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
 
@@ -272,7 +284,7 @@ model DanaOperasional {
   transaksi_list   DanaTransaksi[]
   sk_default_list  Sk[] @relation("SkDanaDefault")
 
-  @@unique([unit_koordinator_id, tahun_fiscal])
+  @@unique([unit_koordinator_id, tahun_fiscal, kategori_kamar])
   @@map("dana_operasional")
 }
 

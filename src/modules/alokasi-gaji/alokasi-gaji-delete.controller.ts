@@ -114,24 +114,32 @@ export class AlokasiDeleteController {
       });
       const namaKegiatan = `Refund alokasi gaji TA ${upd.pegawai?.nama ?? upd.pegawai_id} periode ${upd.periode_bulan}/${upd.periode_tahun}`;
       if (upd.sumber_dana === 'RO' && upd.ro_id) {
+        await tx.ro.update({
+          where: { id: upd.ro_id },
+          data: { total_plafon: { increment: upd.jumlah } },
+        });
         await tx.roTransaksi.create({
           data: {
             ro_id: upd.ro_id,
             nama_kegiatan: namaKegiatan,
             tanggal: new Date(),
-            debit: 0,
-            kredit: upd.jumlah,
+            debit: upd.jumlah,
+            kredit: 0,
             keterangan: `Cancel alokasi ${id}`,
           },
         });
       } else if (upd.sumber_dana === 'OPERASIONAL' && upd.dana_operasional_id) {
+        await tx.danaOperasional.update({
+          where: { id: upd.dana_operasional_id },
+          data: { total_plafon: { increment: upd.jumlah } },
+        });
         await tx.danaTransaksi.create({
           data: {
             dana_id: upd.dana_operasional_id,
             nama_kegiatan: namaKegiatan,
             tanggal: new Date(),
-            debit: 0,
-            kredit: upd.jumlah,
+            debit: upd.jumlah,
+            kredit: 0,
             keterangan: `Cancel alokasi ${id}`,
           },
         });

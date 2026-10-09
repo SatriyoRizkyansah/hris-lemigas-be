@@ -85,20 +85,15 @@ export class AlokasiPostController {
 
     // Atomic create + ledger debit via $transaction
     const alokasi = await this.prisma.$transaction(async (tx) => {
-      // Re-validate balance inside transaction using tx
+      // Re-validate balance inside transaction: spec total_plafon >= jumlah
       if (body.sumber_dana === 'RO') {
         if (!body.id_ro)
           throw new BadRequestException('RO wajib diisi untuk sumber RO');
         const ro = await tx.ro.findUnique({ where: { id: body.id_ro } });
         if (!ro) throw new BadRequestException('RO tidak ditemukan');
-        const terpakai = await tx.alokasiGajiTA.aggregate({
-          _sum: { jumlah: true },
-          where: { ro_id: body.id_ro, status: 'AKTIF' },
-        });
-        const sisa = ro.total_plafon - (terpakai._sum.jumlah ?? 0);
-        if (body.jumlah > sisa) {
+        if (body.jumlah > ro.total_plafon) {
           throw new BadRequestException(
-            `Saldo RO ${ro.kode_ro} tidak mencukupi. Sisa Rp ${sisa.toLocaleString('id-ID')}, alokasi Rp ${body.jumlah.toLocaleString('id-ID')}`,
+            `Saldo RO ${ro.kode_ro} tidak mencukupi. Sisa Rp ${ro.total_plafon.toLocaleString('id-ID')}, alokasi Rp ${body.jumlah.toLocaleString('id-ID')}`,
           );
         }
       } else {
@@ -109,17 +104,9 @@ export class AlokasiPostController {
         });
         if (!dana)
           throw new BadRequestException('Dana operasional tidak ditemukan');
-        const terpakai = await tx.alokasiGajiTA.aggregate({
-          _sum: { jumlah: true },
-          where: {
-            dana_operasional_id: body.id_dana_operasional,
-            status: 'AKTIF',
-          },
-        });
-        const sisa = dana.total_plafon - (terpakai._sum.jumlah ?? 0);
-        if (body.jumlah > sisa) {
+        if (body.jumlah > dana.total_plafon) {
           throw new BadRequestException(
-            `Saldo dana operasional tidak mencukupi. Sisa Rp ${sisa.toLocaleString('id-ID')}, alokasi Rp ${body.jumlah.toLocaleString('id-ID')}`,
+            `Saldo dana operasional tidak mencukupi. Sisa Rp ${dana.total_plafon.toLocaleString('id-ID')}, alokasi Rp ${body.jumlah.toLocaleString('id-ID')}`,
           );
         }
       }
@@ -145,13 +132,17 @@ export class AlokasiPostController {
       const namaKegiatan = `Alokasi gaji TA ${pegawaiForLedger?.nama ?? body.id_pegawai} periode ${body.periode_bulan}/${body.periode_tahun}`;
 
       if (body.sumber_dana === 'RO' && body.id_ro) {
+        await tx.ro.update({
+          where: { id: body.id_ro },
+          data: { total_plafon: { decrement: body.jumlah } },
+        });
         await tx.roTransaksi.create({
           data: {
             ro_id: body.id_ro,
-            nama_kegiatan: namaKegiatan,
+            nama_kegiatan: `Pembayaran Gaji TA - ${pegawaiForLedger?.nama ?? body.id_pegawai}`,
             tanggal: new Date(),
-            debit: body.jumlah,
-            kredit: 0,
+            debit: 0,
+            kredit: body.jumlah,
             keterangan: body.keterangan ?? `Alokasi ${created.id}`,
           },
         });
@@ -159,13 +150,17 @@ export class AlokasiPostController {
         body.sumber_dana === 'OPERASIONAL' &&
         body.id_dana_operasional
       ) {
+        await tx.danaOperasional.update({
+          where: { id: body.id_dana_operasional },
+          data: { total_plafon: { decrement: body.jumlah } },
+        });
         await tx.danaTransaksi.create({
           data: {
             dana_id: body.id_dana_operasional,
-            nama_kegiatan: namaKegiatan,
+            nama_kegiatan: `Pembayaran Gaji TA - ${pegawaiForLedger?.nama ?? body.id_pegawai}`,
             tanggal: new Date(),
-            debit: body.jumlah,
-            kredit: 0,
+            debit: 0,
+            kredit: body.jumlah,
             keterangan: body.keterangan ?? `Alokasi ${created.id}`,
           },
         });

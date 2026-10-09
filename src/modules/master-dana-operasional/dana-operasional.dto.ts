@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsDateString,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -9,6 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { EmptyToUndefined } from '../../common/utils/empty-to-undefined.js';
+import { KategoriKamar } from '../../common/enums/hris.enum.js';
 
 export class CreateDanaOperasionalDto {
   @ApiProperty({ description: 'ID unit koordinator pemilik dana operasional' })
@@ -27,6 +29,15 @@ export class CreateDanaOperasionalDto {
   @IsInt()
   @Min(0)
   total_plafon: number;
+
+  @ApiPropertyOptional({
+    enum: KategoriKamar,
+    example: KategoriKamar.LAINNYA,
+    description: 'Kategori kamar wallet',
+  })
+  @IsEnum(KategoriKamar)
+  @IsOptional()
+  kategori_kamar?: KategoriKamar;
 }
 
 export class UpdateDanaOperasionalDto {
@@ -61,6 +72,9 @@ export class DanaOperasionalItemDto {
 
   @ApiPropertyOptional({ nullable: true })
   nama_unit_koordinator?: string | null;
+
+  @ApiPropertyOptional({ enum: KategoriKamar })
+  kategori_kamar?: KategoriKamar;
 
   @ApiPropertyOptional()
   created_at?: Date;

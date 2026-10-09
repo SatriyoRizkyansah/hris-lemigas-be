@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { AuditService } from './services/audit.service.js';
 import { FundService } from './services/fund.service.js';
+import { FundDistributionService } from './services/fund-distribution.service.js';
 import { UnitScopeService } from './services/unit-scope.service.js';
 import { FileService } from './services/file.service.js';
 import { AlokasiValidationService } from './services/alokasi-validation.service.js';
@@ -10,6 +11,7 @@ import { AlokasiValidationService } from './services/alokasi-validation.service.
   providers: [
     AuditService,
     FundService,
+    FundDistributionService,
     UnitScopeService,
     FileService,
     AlokasiValidationService,
@@ -17,6 +19,7 @@ import { AlokasiValidationService } from './services/alokasi-validation.service.
   exports: [
     AuditService,
     FundService,
+    FundDistributionService,
     UnitScopeService,
     FileService,
     AlokasiValidationService,

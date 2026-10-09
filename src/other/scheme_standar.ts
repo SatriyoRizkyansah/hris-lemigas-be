@@ -98,27 +98,39 @@ export const ApiStandartResponseArray = <DataDto extends Type<unknown>>(
     }),
   );
 
-// schema standar (single object)
-export const ApiStandartResponse = <DataDto extends Type<unknown>>(
-  dataDto: DataDto,
-) =>
-  applyDecorators(
-    ApiExtraModels(StandartResponse, dataDto),
+// schema standar (single object) - dataDto optional for ledger/raw responses
+export function ApiStandartResponse<DataDto extends Type<unknown>>(
+  dataDto?: DataDto,
+) {
+  if (dataDto) {
+    return applyDecorators(
+      ApiExtraModels(StandartResponse, dataDto),
+      ApiResponse({ status: 400, description: 'Bad Request' }),
+      ApiResponse({ status: 500, description: 'Server Error' }),
+      ApiOkResponse({
+        schema: {
+          allOf: [
+            { $ref: getSchemaPath(StandartResponse) },
+            { properties: { data: { $ref: getSchemaPath(dataDto) } } },
+          ],
+        },
+      }),
+    );
+  }
+  return applyDecorators(
+    ApiExtraModels(StandartResponse),
     ApiResponse({ status: 400, description: 'Bad Request' }),
     ApiResponse({ status: 500, description: 'Server Error' }),
     ApiOkResponse({
       schema: {
         allOf: [
           { $ref: getSchemaPath(StandartResponse) },
-          {
-            properties: {
-              data: { $ref: getSchemaPath(dataDto) },
-            },
-          },
+          { properties: { data: { type: 'object' } } },
         ],
       },
     }),
   );
+}
 
 // schema create
 export const ApiStandartResponseCreate = <DataDto extends Type<unknown>>(

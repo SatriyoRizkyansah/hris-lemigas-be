@@ -44,3 +44,12 @@ export enum AksiAudit {
   ACTIVATE = 'ACTIVATE',
   CANCEL = 'CANCEL',
 }
+
+export enum KategoriKamar {
+  P1_PNS_NON_PNS = 'P1_PNS_NON_PNS',
+  P2_KP3 = 'P2_KP3',
+  OPS_KANTOR = 'OPS_KANTOR',
+  OPS_KP3 = 'OPS_KP3',
+  MULOS_SPI = 'MULOS_SPI',
+  LAINNYA = 'LAINNYA',
+}

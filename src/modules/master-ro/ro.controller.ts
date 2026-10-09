@@ -165,6 +165,28 @@ export class RoController {
     });
   }
 
+  @Get(':id/ledger')
+  @ApiRoles('Get ledger RO', [Role.Superadmin, Role.Koordinator])
+  @ApiStandartResponse()
+  async getLedger(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const ro = await this.prisma.ro.findUnique({ where: { id } });
+    if (!ro) throw new NotFoundException('RO tidak ditemukan');
+    if (user.role === Role.Koordinator && user.unitKerjaId) {
+      const inScope = await this.unitScope.isUnitInScope(
+        ro.unit_koordinator_id,
+        user.unitKerjaId,
+      );
+      if (!inScope) {
+        throw new BadRequestException('Anda tidak memiliki akses ke RO ini');
+      }
+    }
+    const ledger = await this.fund.getRoLedger(id);
+    return ok('Berhasil mengambil ledger RO', ledger);
+  }
+
   @Post(':id/rab')
   @ApiRoles('Upload RAB RO', [Role.Superadmin, Role.Koordinator])
   @UseInterceptors(FileInterceptor('file'))

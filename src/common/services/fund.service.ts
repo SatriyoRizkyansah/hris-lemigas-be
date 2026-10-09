@@ -11,8 +11,8 @@ export class FundService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Saldo RO = plafon - (alokasi aktif + net debit transaksi).
-   * debit = pengeluaran, kredit = pemasukan/pengembalian.
+   * Saldo RO: total_plafon sudah di-decrement saat alokasi (spec fase 2).
+   * sisa = total_plafon (remaining), terpakai = alokasi aktif (1:1 dengan kredit).
    */
   async getRoBalance(roId: string) {
     const ro = await this.prisma.ro.findUnique({ where: { id: roId } });
@@ -32,7 +32,7 @@ export class FundService {
     const alokasi_terpakai = terpakai._sum.jumlah ?? 0;
     const trx_debit = trxAgg._sum.debit ?? 0;
     const trx_kredit = trxAgg._sum.kredit ?? 0;
-    const total_terpakai = alokasi_terpakai + trx_debit - trx_kredit;
+    const total_terpakai = alokasi_terpakai;
 
     return {
       id: ro.id,
@@ -40,7 +40,7 @@ export class FundService {
       nama_ro: ro.nama_ro,
       total_plafon: ro.total_plafon,
       total_terpakai,
-      sisa_saldo: ro.total_plafon - total_terpakai,
+      sisa_saldo: ro.total_plafon,
       alokasi_terpakai,
       trx_debit,
       trx_kredit,
@@ -48,7 +48,8 @@ export class FundService {
   }
 
   /**
-   * Saldo dana operasional = plafon - (alokasi aktif + net debit transaksi).
+   * Saldo dana operasional: sisa = total_plafon (sudah decrement+increment distribusi),
+   * terpakai = alokasi aktif. trx_debit/kredit untuk ledger info.
    */
   async getOperationalBalance(danaOperasionalId: string) {
     const dana = await this.prisma.danaOperasional.findUnique({
@@ -70,7 +71,7 @@ export class FundService {
     const alokasi_terpakai = terpakai._sum.jumlah ?? 0;
     const trx_debit = trxAgg._sum.debit ?? 0;
     const trx_kredit = trxAgg._sum.kredit ?? 0;
-    const total_terpakai = alokasi_terpakai + trx_debit - trx_kredit;
+    const total_terpakai = alokasi_terpakai;
 
     return {
       id: dana.id,
@@ -78,7 +79,7 @@ export class FundService {
       tahun_fiscal: dana.tahun_fiscal,
       total_plafon: dana.total_plafon,
       total_terpakai,
-      sisa_saldo: dana.total_plafon - total_terpakai,
+      sisa_saldo: dana.total_plafon,
       alokasi_terpakai,
       trx_debit,
       trx_kredit,
@@ -88,40 +89,52 @@ export class FundService {
   async getRoLedger(roId: string) {
     const list = await this.prisma.roTransaksi.findMany({
       where: { ro_id: roId },
-      orderBy: { tanggal: 'asc' },
+      orderBy: [{ tanggal: 'asc' }, { created_at: 'asc' }],
     });
-    const total_debit = list.reduce((s, r) => s + r.debit, 0);
-    const total_kredit = list.reduce((s, r) => s + r.kredit, 0);
+    const total_debit = list.reduce(
+      (s: number, r: { debit: number }) => s + r.debit,
+      0,
+    );
+    const total_kredit = list.reduce(
+      (s: number, r: { kredit: number }) => s + r.kredit,
+      0,
+    );
     let running = 0;
-    const withSaldo = list.map((r) => {
-      running += r.kredit - r.debit;
+    const withSaldo = list.map((r: { debit: number; kredit: number }) => {
+      running += r.debit - r.kredit;
       return { ...r, saldo: running };
     });
     return {
       list: withSaldo,
       total_debit,
       total_kredit,
-      saldo_ledger: total_kredit - total_debit,
+      saldo_ledger: total_debit - total_kredit,
     };
   }
 
   async getDanaLedger(danaId: string) {
     const list = await this.prisma.danaTransaksi.findMany({
       where: { dana_id: danaId },
-      orderBy: { tanggal: 'asc' },
+      orderBy: [{ tanggal: 'asc' }, { created_at: 'asc' }],
     });
-    const total_debit = list.reduce((s, r) => s + r.debit, 0);
-    const total_kredit = list.reduce((s, r) => s + r.kredit, 0);
+    const total_debit = list.reduce(
+      (s: number, r: { debit: number }) => s + r.debit,
+      0,
+    );
+    const total_kredit = list.reduce(
+      (s: number, r: { kredit: number }) => s + r.kredit,
+      0,
+    );
     let running = 0;
-    const withSaldo = list.map((r) => {
-      running += r.kredit - r.debit;
+    const withSaldo = list.map((r: { debit: number; kredit: number }) => {
+      running += r.debit - r.kredit;
       return { ...r, saldo: running };
     });
     return {
       list: withSaldo,
       total_debit,
       total_kredit,
-      saldo_ledger: total_kredit - total_debit,
+      saldo_ledger: total_debit - total_kredit,
     };
   }
 

@@ -175,6 +175,32 @@ export class DanaOperasionalController {
     });
   }
 
+  @Get(':id/ledger')
+  @ApiRoles('Get ledger Dana Operasional', [Role.Superadmin, Role.Koordinator])
+  @ApiStandartResponse()
+  async getLedger(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const dana = await this.prisma.danaOperasional.findUnique({
+      where: { id },
+    });
+    if (!dana) throw new NotFoundException('Dana operasional tidak ditemukan');
+    if (user.role === Role.Koordinator && user.unitKerjaId) {
+      const inScope = await this.unitScope.isUnitInScope(
+        dana.unit_koordinator_id,
+        user.unitKerjaId,
+      );
+      if (!inScope) {
+        throw new BadRequestException(
+          'Anda tidak memiliki akses ke dana operasional ini',
+        );
+      }
+    }
+    const ledger = await this.fund.getDanaLedger(id);
+    return ok('Berhasil mengambil ledger dana operasional', ledger);
+  }
+
   @Post()
   @ApiRoles('Tambah dana operasional', [Role.Superadmin])
   @ApiStandartResponseCreate(DanaOperasionalItemDto)
@@ -193,17 +219,19 @@ export class DanaOperasionalController {
       );
     }
 
+    const kategori = (body as any).kategori_kamar ?? 'LAINNYA';
     const exists = await this.prisma.danaOperasional.findUnique({
       where: {
-        unit_koordinator_id_tahun_fiscal: {
+        unit_koordinator_id_tahun_fiscal_kategori_kamar: {
           unit_koordinator_id: body.id_unit_koordinator,
           tahun_fiscal: body.tahun_fiscal,
+          kategori_kamar: kategori as any,
         },
       },
     });
     if (exists) {
       throw new ConflictException(
-        `Dana operasional untuk unit ${unit.nama_unit} tahun ${body.tahun_fiscal} sudah ada`,
+        `Dana operasional untuk unit ${unit.nama_unit} tahun ${body.tahun_fiscal} kategori ${kategori} sudah ada`,
       );
     }
 
@@ -211,6 +239,7 @@ export class DanaOperasionalController {
       data: {
         unit_koordinator_id: body.id_unit_koordinator,
         tahun_fiscal: body.tahun_fiscal,
+        kategori_kamar: kategori as any,
         total_plafon: body.total_plafon,
       },
       include: {
@@ -323,11 +352,12 @@ export class DanaOperasionalController {
       tahun_fiscal: item.tahun_fiscal,
       total_plafon: item.total_plafon,
       total_terpakai: totalTerpakai,
-      sisa_saldo: item.total_plafon - totalTerpakai,
+      sisa_saldo: item.total_plafon,
       id_unit_koordinator: item.unit_koordinator?.id ?? null,
       nama_unit_koordinator: item.unit_koordinator?.nama_unit ?? null,
+      kategori_kamar: item.kategori_kamar ?? 'LAINNYA',
       created_at: item.created_at,
       updated_at: item.updated_at,
-    };
+    } as any;
   }
 }

@@ -145,22 +145,21 @@ export class AlokasiPutController {
           if (newSumber === 'RO' && newRoId) {
             const ro = await tx.ro.findUnique({ where: { id: newRoId } });
             if (!ro) throw new BadRequestException('RO tidak ditemukan');
-            const terpakai = await tx.alokasiGajiTA.aggregate({
-              _sum: { jumlah: true },
-              where: { ro_id: newRoId, status: 'AKTIF' },
-            });
-            const sisa = ro.total_plafon - (terpakai._sum.jumlah ?? 0);
-            if (delta > sisa)
+            if (delta > ro.total_plafon)
               throw new BadRequestException(
-                `Saldo RO ${ro.kode_ro} tidak mencukupi. Sisa Rp ${sisa.toLocaleString('id-ID')}, delta Rp ${delta.toLocaleString('id-ID')}`,
+                `Saldo RO ${ro.kode_ro} tidak mencukupi. Sisa Rp ${ro.total_plafon.toLocaleString('id-ID')}, delta Rp ${delta.toLocaleString('id-ID')}`,
               );
+            await tx.ro.update({
+              where: { id: newRoId },
+              data: { total_plafon: { decrement: delta } },
+            });
             await tx.roTransaksi.create({
               data: {
                 ro_id: newRoId,
-                nama_kegiatan: namaKegiatan + ' (update)',
+                nama_kegiatan: `Pembayaran Gaji TA - ${pegawaiForLedger?.nama ?? existing.pegawai_id} (update)`,
                 tanggal: new Date(),
-                debit: delta,
-                kredit: 0,
+                debit: 0,
+                kredit: delta,
                 keterangan: `Update alokasi ${id}`,
               },
             });
@@ -170,62 +169,73 @@ export class AlokasiPutController {
             });
             if (!dana)
               throw new BadRequestException('Dana operasional tidak ditemukan');
-            const terpakai = await tx.alokasiGajiTA.aggregate({
-              _sum: { jumlah: true },
-              where: { dana_operasional_id: newDanaId, status: 'AKTIF' },
-            });
-            const sisa = dana.total_plafon - (terpakai._sum.jumlah ?? 0);
-            if (delta > sisa)
+            if (delta > dana.total_plafon)
               throw new BadRequestException(
-                `Saldo dana operasional tidak mencukupi. Sisa Rp ${sisa.toLocaleString('id-ID')}, delta Rp ${delta.toLocaleString('id-ID')}`,
+                `Saldo dana operasional tidak mencukupi. Sisa Rp ${dana.total_plafon.toLocaleString('id-ID')}, delta Rp ${delta.toLocaleString('id-ID')}`,
               );
+            await tx.danaOperasional.update({
+              where: { id: newDanaId },
+              data: { total_plafon: { decrement: delta } },
+            });
             await tx.danaTransaksi.create({
               data: {
                 dana_id: newDanaId,
-                nama_kegiatan: namaKegiatan + ' (update)',
+                nama_kegiatan: `Pembayaran Gaji TA - ${pegawaiForLedger?.nama ?? existing.pegawai_id} (update)`,
                 tanggal: new Date(),
-                debit: delta,
-                kredit: 0,
+                debit: 0,
+                kredit: delta,
                 keterangan: `Update alokasi ${id}`,
               },
             });
           }
         } else if (delta < 0) {
-          const kreditAmt = -delta;
+          const refundAmt = -delta;
           if (newSumber === 'RO' && newRoId) {
+            await tx.ro.update({
+              where: { id: newRoId },
+              data: { total_plafon: { increment: refundAmt } },
+            });
             await tx.roTransaksi.create({
               data: {
                 ro_id: newRoId,
-                nama_kegiatan: namaKegiatan + ' (koreksi)',
+                nama_kegiatan: `Pembayaran Gaji TA - ${pegawaiForLedger?.nama ?? existing.pegawai_id} (koreksi)`,
                 tanggal: new Date(),
-                debit: 0,
-                kredit: kreditAmt,
+                debit: refundAmt,
+                kredit: 0,
                 keterangan: `Koreksi alokasi ${id}`,
               },
             });
           } else if (newSumber === 'OPERASIONAL' && newDanaId) {
+            await tx.danaOperasional.update({
+              where: { id: newDanaId },
+              data: { total_plafon: { increment: refundAmt } },
+            });
             await tx.danaTransaksi.create({
               data: {
                 dana_id: newDanaId,
-                nama_kegiatan: namaKegiatan + ' (koreksi)',
+                nama_kegiatan: `Pembayaran Gaji TA - ${pegawaiForLedger?.nama ?? existing.pegawai_id} (koreksi)`,
                 tanggal: new Date(),
-                debit: 0,
-                kredit: kreditAmt,
+                debit: refundAmt,
+                kredit: 0,
                 keterangan: `Koreksi alokasi ${id}`,
               },
             });
           }
         }
       } else {
-        // Kembalikan saldo sumber lama (kredit)
+        // Kembalikan saldo sumber lama (refund: increment plafon + debit)
         if (existing.sumber_dana === 'RO' && existing.ro_id) {
+          await tx.ro.update({
+            where: { id: existing.ro_id },
+            data: { total_plafon: { increment: existing.jumlah } },
+          });
           await tx.roTransaksi.create({
             data: {
               ro_id: existing.ro_id,
-              nama_kegiatan: namaKegiatan + ' (pindah sumber)',
+              nama_kegiatan: `Pembayaran Gaji TA - ${pegawaiForLedger?.nama ?? existing.pegawai_id} (pindah sumber - refund)`,
               tanggal: new Date(),
-              debit: 0,
-              kredit: existing.jumlah,
+              debit: existing.jumlah,
+              kredit: 0,
               keterangan: `Pindah sumber alokasi ${id}`,
             },
           });
@@ -233,37 +243,40 @@ export class AlokasiPutController {
           existing.sumber_dana === 'OPERASIONAL' &&
           existing.dana_operasional_id
         ) {
+          await tx.danaOperasional.update({
+            where: { id: existing.dana_operasional_id },
+            data: { total_plafon: { increment: existing.jumlah } },
+          });
           await tx.danaTransaksi.create({
             data: {
               dana_id: existing.dana_operasional_id,
-              nama_kegiatan: namaKegiatan + ' (pindah sumber)',
+              nama_kegiatan: `Pembayaran Gaji TA - ${pegawaiForLedger?.nama ?? existing.pegawai_id} (pindah sumber - refund)`,
               tanggal: new Date(),
-              debit: 0,
-              kredit: existing.jumlah,
+              debit: existing.jumlah,
+              kredit: 0,
               keterangan: `Pindah sumber alokasi ${id}`,
             },
           });
         }
-        // Cek saldo sumber baru
+        // Cek saldo sumber baru (spec: total_plafon >= jumlah)
         if (newSumber === 'RO' && newRoId) {
           const ro = await tx.ro.findUnique({ where: { id: newRoId } });
           if (!ro) throw new BadRequestException('RO tidak ditemukan');
-          const terpakai = await tx.alokasiGajiTA.aggregate({
-            _sum: { jumlah: true },
-            where: { ro_id: newRoId, status: 'AKTIF' },
-          });
-          const sisa = ro.total_plafon - (terpakai._sum.jumlah ?? 0);
-          if (newJumlah > sisa)
+          if (newJumlah > ro.total_plafon)
             throw new BadRequestException(
-              `Saldo RO ${ro.kode_ro} tidak mencukupi. Sisa Rp ${sisa.toLocaleString('id-ID')}, alokasi Rp ${newJumlah.toLocaleString('id-ID')}`,
+              `Saldo RO ${ro.kode_ro} tidak mencukupi. Sisa Rp ${ro.total_plafon.toLocaleString('id-ID')}, alokasi Rp ${newJumlah.toLocaleString('id-ID')}`,
             );
+          await tx.ro.update({
+            where: { id: newRoId },
+            data: { total_plafon: { decrement: newJumlah } },
+          });
           await tx.roTransaksi.create({
             data: {
               ro_id: newRoId,
-              nama_kegiatan: namaKegiatan + ' (pindah sumber)',
+              nama_kegiatan: `Pembayaran Gaji TA - ${pegawaiForLedger?.nama ?? existing.pegawai_id} (pindah sumber)`,
               tanggal: new Date(),
-              debit: newJumlah,
-              kredit: 0,
+              debit: 0,
+              kredit: newJumlah,
               keterangan: `Pindah sumber alokasi ${id}`,
             },
           });
@@ -273,22 +286,21 @@ export class AlokasiPutController {
           });
           if (!dana)
             throw new BadRequestException('Dana operasional tidak ditemukan');
-          const terpakai = await tx.alokasiGajiTA.aggregate({
-            _sum: { jumlah: true },
-            where: { dana_operasional_id: newDanaId, status: 'AKTIF' },
-          });
-          const sisa = dana.total_plafon - (terpakai._sum.jumlah ?? 0);
-          if (newJumlah > sisa)
+          if (newJumlah > dana.total_plafon)
             throw new BadRequestException(
-              `Saldo dana operasional tidak mencukupi. Sisa Rp ${sisa.toLocaleString('id-ID')}, alokasi Rp ${newJumlah.toLocaleString('id-ID')}`,
+              `Saldo dana operasional tidak mencukupi. Sisa Rp ${dana.total_plafon.toLocaleString('id-ID')}, alokasi Rp ${newJumlah.toLocaleString('id-ID')}`,
             );
+          await tx.danaOperasional.update({
+            where: { id: newDanaId },
+            data: { total_plafon: { decrement: newJumlah } },
+          });
           await tx.danaTransaksi.create({
             data: {
               dana_id: newDanaId,
-              nama_kegiatan: namaKegiatan + ' (pindah sumber)',
+              nama_kegiatan: `Pembayaran Gaji TA - ${pegawaiForLedger?.nama ?? existing.pegawai_id} (pindah sumber)`,
               tanggal: new Date(),
-              debit: newJumlah,
-              kredit: 0,
+              debit: 0,
+              kredit: newJumlah,
               keterangan: `Pindah sumber alokasi ${id}`,
             },
           });
