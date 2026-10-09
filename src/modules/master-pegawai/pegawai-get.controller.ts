@@ -37,7 +37,11 @@ export class PegawaiGetController {
   ) {}
 
   @Get()
-  @ApiRoles('Get daftar pegawai', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get daftar pegawai', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponseArrayWithPagination(PegawaiItemDto)
   async getData(
     @CurrentUser() user: JwtPayload,
@@ -61,8 +65,8 @@ export class PegawaiGetController {
       where.sk_list = skFilter(scoped);
     }
 
-    // Scope koordinator: hanya unit sendiri + anak unit (via SK homebase)
-    if (user.role === Role.Koordinator) {
+    // Scope koordinator/keuangan: hanya unit sendiri + anak unit (via SK homebase)
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId) {
         return paginated(
           'Berhasil mengambil data pegawai',
@@ -134,7 +138,11 @@ export class PegawaiGetController {
   }
 
   @Get(':id')
-  @ApiRoles('Get detail pegawai', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get detail pegawai', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponse(PegawaiDetailDto)
   async getDetail(
     @CurrentUser() user: JwtPayload,
@@ -168,8 +176,11 @@ export class PegawaiGetController {
       };
     }
 
-    // Scope check koordinator via SK homebase
-    if (user.role === Role.Koordinator && user.unitKerjaId) {
+    // Scope check koordinator/keuangan via SK homebase
+    if (
+      (user.role === Role.Koordinator || user.role === Role.Keuangan) &&
+      user.unitKerjaId
+    ) {
       const homebase =
         pegawai.sk_list?.find(
           (p: any) => p.is_homebase && p.status_aktif === 'AKTIF',

@@ -52,7 +52,11 @@ export class ProyekController {
   ) {}
 
   @Get()
-  @ApiRoles('Get daftar proyek', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get daftar proyek', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponseArrayWithPagination(ProyekItemDto)
   async getData(@Query() query: ProyekQueryDto) {
     const where: Record<string, unknown> = {};
@@ -100,7 +104,11 @@ export class ProyekController {
   }
 
   @Get(':id')
-  @ApiRoles('Get detail proyek', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get detail proyek', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponse(ProyekItemDto)
   async getDetail(@Param('id', ParseUUIDPipe) id: string) {
     const proyek = await this.prisma.proyek.findUnique({

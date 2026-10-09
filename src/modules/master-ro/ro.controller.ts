@@ -56,7 +56,7 @@ export class RoController {
   ) {}
 
   @Get()
-  @ApiRoles('Get daftar RO', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get daftar RO', [Role.Superadmin, Role.Koordinator, Role.Keuangan])
   @ApiStandartResponseArrayWithPagination(RoItemDto)
   async getData(@CurrentUser() user: JwtPayload, @Query() query: RoQueryDto) {
     const where: Record<string, unknown> = {};
@@ -71,8 +71,8 @@ export class RoController {
       ];
     }
 
-    // Koordinator: hanya RO milik unit dalam scope
-    if (user.role === Role.Koordinator) {
+    // Koordinator/Keuangan: hanya RO milik unit dalam scope (Keuangan read-only monitoring)
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId) {
         return paginated(
           'Berhasil mengambil data RO',
@@ -119,7 +119,7 @@ export class RoController {
   }
 
   @Get(':id')
-  @ApiRoles('Get detail RO', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get detail RO', [Role.Superadmin, Role.Koordinator, Role.Keuangan])
   @ApiStandartResponse(RoItemDto)
   async getDetail(
     @CurrentUser() user: JwtPayload,
@@ -134,7 +134,10 @@ export class RoController {
     });
     if (!ro) throw new NotFoundException('RO tidak ditemukan');
 
-    if (user.role === Role.Koordinator && user.unitKerjaId) {
+    if (
+      (user.role === Role.Koordinator || user.role === Role.Keuangan) &&
+      user.unitKerjaId
+    ) {
       const inScope = await this.unitScope.isUnitInScope(
         ro.unit_koordinator_id,
         user.unitKerjaId,
@@ -166,7 +169,7 @@ export class RoController {
   }
 
   @Get(':id/ledger')
-  @ApiRoles('Get ledger RO', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get ledger RO', [Role.Superadmin, Role.Koordinator, Role.Keuangan])
   @ApiStandartResponse()
   async getLedger(
     @CurrentUser() user: JwtPayload,

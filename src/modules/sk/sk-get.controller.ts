@@ -29,7 +29,7 @@ export class SkGetController {
   ) {}
 
   @Get()
-  @ApiRoles('Get daftar SK', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get daftar SK', [Role.Superadmin, Role.Koordinator, Role.Keuangan])
   @ApiStandartResponseArrayWithPagination(SkItemDto)
   async getData(@CurrentUser() user: JwtPayload, @Query() query: SkQueryDto) {
     const where: Record<string, unknown> = {};
@@ -44,8 +44,8 @@ export class SkGetController {
       ];
     }
 
-    // Koordinator: hanya SK untuk pegawai/unit dalam scope
-    if (user.role === Role.Koordinator) {
+    // Koordinator/Keuangan: hanya SK untuk pegawai/unit dalam scope
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId) {
         return paginated(
           'Berhasil mengambil data SK',
@@ -86,7 +86,11 @@ export class SkGetController {
   }
 
   @Get('expiring-soon')
-  @ApiRoles('SK hampir habis (30 hari)', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('SK hampir habis (30 hari)', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponseArrayWithPagination(SkItemDto)
   async getExpiringSoon(
     @CurrentUser() user: JwtPayload,
@@ -109,7 +113,7 @@ export class SkGetController {
         { pegawai: { nama: { contains: query.query, mode: 'insensitive' } } },
       ];
     }
-    if (user.role === Role.Koordinator) {
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId)
         return paginated(
           'Berhasil mengambil SK expiring soon',
@@ -147,7 +151,11 @@ export class SkGetController {
   }
 
   @Get('pegawai/:pegawaiId')
-  @ApiRoles('Get riwayat SK pegawai', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get riwayat SK pegawai', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponseArrayWithPagination(SkItemDto)
   async getRiwayat(
     @CurrentUser() user: JwtPayload,

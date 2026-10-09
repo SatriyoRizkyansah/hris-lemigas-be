@@ -29,7 +29,11 @@ export class RoTransaksiController {
   ) {}
 
   @Get()
-  @ApiRoles('List transaksi RO', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('List transaksi RO', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   async list(@Param('id', ParseUUIDPipe) id: string) {
     const ledger = await this.fund.getRoLedger(id);
     return ok('Berhasil mengambil transaksi RO', ledger);

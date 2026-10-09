@@ -59,6 +59,20 @@ class DanaOperasionalQueryDto extends PaginateQuery {
   @IsOptional()
   @Type(() => Number)
   tahun_fiscal?: number;
+
+  @ApiPropertyOptional({
+    enum: [
+      'P1_PNS_NON_PNS',
+      'P2_KP3',
+      'OPS_KANTOR',
+      'OPS_KP3',
+      'MULOS_SPI',
+      'LAINNYA',
+    ],
+    description: 'Filter kategori kamar',
+  })
+  @IsOptional()
+  kategori_kamar?: string;
 }
 
 @ApiTags('Master - Dana Operasional')
@@ -87,6 +101,8 @@ export class DanaOperasionalController {
     if (query.id_unit_koordinator)
       where.unit_koordinator_id = query.id_unit_koordinator;
     if (query.tahun_fiscal) where.tahun_fiscal = query.tahun_fiscal;
+    if ((query as any).kategori_kamar)
+      where.kategori_kamar = (query as any).kategori_kamar;
 
     // Koordinator/Keuangan: hanya dana operasional unit dalam scope
     if (user.role === Role.Koordinator || user.role === Role.Keuangan) {

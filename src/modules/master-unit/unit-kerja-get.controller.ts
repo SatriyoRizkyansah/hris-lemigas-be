@@ -29,7 +29,11 @@ export class UnitKerjaGetController {
   ) {}
 
   @Get()
-  @ApiRoles('Get daftar unit kerja', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get daftar unit kerja', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponseArrayWithPagination(UnitKerjaItemDto)
   async getData(
     @CurrentUser() user: JwtPayload,
@@ -45,8 +49,8 @@ export class UnitKerjaGetController {
       ];
     }
 
-    // Koordinator: hanya unit dalam scope-nya
-    if (user.role === Role.Koordinator) {
+    // Koordinator/Keuangan: hanya unit dalam scope-nya
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId) {
         return paginated(
           'Berhasil mengambil data unit kerja',
@@ -112,6 +116,7 @@ export class UnitKerjaGetController {
   @ApiRoles('Get struktur organisasi (tree)', [
     Role.Superadmin,
     Role.Koordinator,
+    Role.Keuangan,
   ])
   @ApiStandartResponse(UnitKerjaTreeNodeDto)
   async getTree(@CurrentUser() user: JwtPayload) {

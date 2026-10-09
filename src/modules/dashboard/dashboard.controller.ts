@@ -40,7 +40,9 @@ class KoordinatorDashboardQueryDto {
   @Type(() => Number)
   tahun?: number;
 
-  @ApiPropertyOptional({ description: 'UUID unit koordinator (wajib untuk Superadmin)' })
+  @ApiPropertyOptional({
+    description: 'UUID unit koordinator (wajib untuk Superadmin)',
+  })
   @IsOptional()
   id_unit_koordinator?: string;
 }
@@ -48,8 +50,18 @@ class KoordinatorDashboardQueryDto {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const BULAN_LABEL = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-  'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'Mei',
+  'Jun',
+  'Jul',
+  'Ags',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Des',
 ];
 
 /**
@@ -81,7 +93,7 @@ export class DashboardController {
   // ── 1. SUPERADMIN DASHBOARD ────────────────────────────────────────────────
 
   @Get('superadmin')
-  @ApiRoles('Dashboard superadmin', [Role.Superadmin])
+  @ApiRoles('Dashboard superadmin', [Role.Superadmin, Role.Keuangan])
   async getSuperadminDashboard(@Query() query: DashboardQueryDto) {
     const tahun = query.tahun ?? new Date().getFullYear();
 
@@ -356,9 +368,7 @@ export class DashboardController {
         sisa_saldo: balance.sisa_saldo,
         pct_terpakai:
           balance.total_plafon > 0
-            ? Math.round(
-                (balance.total_terpakai / balance.total_plafon) * 100,
-              )
+            ? Math.round((balance.total_terpakai / balance.total_plafon) * 100)
             : 0,
       });
     }
@@ -499,7 +509,10 @@ export class DashboardController {
   // ── 3. SK EXPIRING SOON ────────────────────────────────────────────────────
 
   @Get('sk-expiring-soon')
-  @ApiRoles('SK yang masa berlakunya hampir habis (30 hari)', [Role.Superadmin])
+  @ApiRoles('SK yang masa berlakunya hampir habis (30 hari)', [
+    Role.Superadmin,
+    Role.Keuangan,
+  ])
   async getSkExpiringSoon() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -536,8 +549,7 @@ export class DashboardController {
 
     const result = skList.map((sk) => {
       const tanggalSelesai = sk.tanggal_selesai!;
-      const diffMs =
-        new Date(tanggalSelesai).getTime() - today.getTime();
+      const diffMs = new Date(tanggalSelesai).getTime() - today.getTime();
       const sisaHari = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
       return {
