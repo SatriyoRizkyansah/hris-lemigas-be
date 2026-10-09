@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsEnum,
   IsOptional,
   IsString,
@@ -44,6 +45,16 @@ export class CreateUserDto {
   role: Role;
 
   @ApiPropertyOptional({
+    enum: Role,
+    isArray: true,
+    description: 'Role tambahan selain role default',
+  })
+  @IsArray()
+  @IsEnum(Role, { each: true })
+  @IsOptional()
+  roles?: Role[];
+
+  @ApiPropertyOptional({
     description: 'Unit kerja (koordinator unit aktif)',
   })
   @IsUUID()
@@ -69,10 +80,21 @@ export class UpdateUserDto {
   @MinLength(6)
   password?: string;
 
-  @ApiPropertyOptional({ enum: Role })
+  @ApiPropertyOptional({ enum: Role, description: 'Role default' })
   @IsEnum(Role)
   @IsOptional()
   role?: Role;
+
+  @ApiPropertyOptional({
+    enum: Role,
+    isArray: true,
+    description:
+      'Daftar role (termasuk default). Jika diisi, akan sync UserRole',
+  })
+  @IsArray()
+  @IsEnum(Role, { each: true })
+  @IsOptional()
+  roles?: Role[];
 
   @ApiPropertyOptional()
   @IsUUID()
@@ -100,6 +122,12 @@ export class UserItemDto {
 
   @ApiPropertyOptional({ nullable: true })
   nama_role?: string | null;
+
+  @ApiProperty({ isArray: true, example: ['SUPERADMIN', 'KEUANGAN'] })
+  roles: string[];
+
+  @ApiPropertyOptional({ isArray: true })
+  roles_detail?: Array<{ id: string; kode: string; nama: string }>;
 
   @ApiPropertyOptional({ nullable: true })
   id_unit_kerja?: string | null;

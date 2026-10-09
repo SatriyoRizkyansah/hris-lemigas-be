@@ -28,8 +28,18 @@ export class RolesGuard implements CanActivate {
 
     if (!user) throw new ForbiddenException('Tidak ada data user pada request');
 
-    const userRole = ROLE_MAP[user.role?.toLowerCase()] ?? (user.role as Role);
-    const isAllowed = requiredRoles.includes(userRole);
+    const userRoles: Role[] = [];
+    if (user.roles && Array.isArray(user.roles) && user.roles.length > 0) {
+      for (const r of user.roles) {
+        const mapped = ROLE_MAP[r?.toLowerCase()] ?? (r as Role);
+        if (mapped) userRoles.push(mapped);
+      }
+    }
+    const activeRole =
+      ROLE_MAP[user.role?.toLowerCase()] ?? (user.role as Role);
+    if (activeRole && !userRoles.includes(activeRole))
+      userRoles.push(activeRole);
+    const isAllowed = requiredRoles.some((req) => userRoles.includes(req));
 
     if (!isAllowed) {
       this.logger.warn(

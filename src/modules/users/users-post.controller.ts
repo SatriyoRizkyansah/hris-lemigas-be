@@ -60,6 +60,22 @@ export class UsersPostController {
 
     const passwordHash = await bcrypt.hash(body.password, 10);
 
+    // Build full role list: default + additional
+    const allRoleKodes = Array.from(
+      new Set([body.role, ...(body.roles ?? [])]),
+    );
+    const roleMap = new Map<
+      string,
+      { id: string; kode: string; nama: string }
+    >();
+    roleMap.set(role.kode, role);
+    for (const kode of allRoleKodes) {
+      if (roleMap.has(kode)) continue;
+      const r = await this.prisma.role.findUnique({ where: { kode } });
+      if (!r) throw new BadRequestException(`Role ${kode} tidak ditemukan`);
+      roleMap.set(kode, r);
+    }
+
     const newUser = await this.prisma.user.create({
       data: {
         email: body.email,
@@ -75,6 +91,19 @@ export class UsersPostController {
         unit_kerja: { select: { id: true, nama_unit: true } },
       },
     });
+
+    // Sync UserRole
+    for (const [kode, r] of roleMap.entries()) {
+      await this.prisma.userRole.upsert({
+        where: { user_id_role_id: { user_id: newUser.id, role_id: r.id } },
+        update: { is_default: kode === body.role },
+        create: {
+          user_id: newUser.id,
+          role_id: r.id,
+          is_default: kode === body.role,
+        },
+      });
+    }
 
     await this.audit.log({
       tabel: 'user',
@@ -93,12 +122,20 @@ export class UsersPostController {
   }
 
   private mapItem(item: any): UserItemDto {
+    const roles: string[] = item.userRoles?.length
+      ? item.userRoles.map((ur: any) => ur.role?.kode ?? '').filter(Boolean)
+      : [item.role?.kode ?? ''].filter(Boolean);
+    const rolesDetail =
+      item.userRoles?.map((ur: any) => ur.role).filter(Boolean) ??
+      (item.role ? [item.role] : []);
     return {
       id: item.id,
       email: item.email,
       nama: item.nama,
       role: item.role?.kode ?? '',
       nama_role: item.role?.nama ?? null,
+      roles,
+      roles_detail: rolesDetail,
       id_unit_kerja: item.unit_kerja?.id ?? null,
       nama_unit_kerja: item.unit_kerja?.nama_unit ?? null,
       status: item.status,

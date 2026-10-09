@@ -39,6 +39,15 @@ async function main() {
       deskripsi: 'Melihat profil, SK, dan alokasi gaji sendiri',
     },
   });
+  const roleKeuangan = await prisma.role.upsert({
+    where: { kode: 'KEUANGAN' },
+    update: {},
+    create: {
+      kode: 'KEUANGAN',
+      nama: 'Keuangan',
+      deskripsi: 'Mengelola verifikasi dan pembayaran alokasi gaji',
+    },
+  });
 
   // ─── Unit Kerja (2 koordinator + 4 sub koordinator) ───────────────────
   const unitKor1 = await prisma.unitKerja.upsert({
@@ -508,6 +517,30 @@ async function main() {
   });
 
   // ─── Users ─────────────────────────────────────────────────────────────
+  // helper sync UserRole (default + tambahan)
+  async function syncUserRoles(
+    userId: string,
+    roleIds: string[],
+    defaultRoleId: string,
+  ) {
+    for (const rid of roleIds) {
+      await prisma.userRole.upsert({
+        where: { user_id_role_id: { user_id: userId, role_id: rid } },
+        update: { is_default: rid === defaultRoleId },
+        create: {
+          user_id: userId,
+          role_id: rid,
+          is_default: rid === defaultRoleId,
+        },
+      });
+    }
+    // ensure only one default
+    await prisma.userRole.updateMany({
+      where: { user_id: userId, role_id: { not: defaultRoleId } },
+      data: { is_default: false },
+    });
+  }
+
   const userSuperadmin = await prisma.user.upsert({
     where: { email: 'superadmin@lemigas.esdm.go.id' },
     update: { nama: 'Super Admin', role_id: roleSuperadmin.id },
@@ -518,9 +551,13 @@ async function main() {
       role_id: roleSuperadmin.id,
     },
   });
-  void userSuperadmin;
+  await syncUserRoles(
+    userSuperadmin.id,
+    [roleSuperadmin.id, roleKeuangan.id],
+    roleSuperadmin.id,
+  );
 
-  await prisma.user.upsert({
+  const userBudi = await prisma.user.upsert({
     where: { email: 'budi.santoso@lemigas.esdm.go.id' },
     update: {
       role_id: roleKoordinator.id,
@@ -536,7 +573,13 @@ async function main() {
       pegawai_id: pegawaiMap.get('196801011992031001'),
     },
   });
-  await prisma.user.upsert({
+  await syncUserRoles(
+    userBudi.id,
+    [roleKoordinator.id, roleKeuangan.id],
+    roleKoordinator.id,
+  );
+
+  const userSiti = await prisma.user.upsert({
     where: { email: 'siti.rahayu@lemigas.esdm.go.id' },
     update: {
       role_id: roleKoordinator.id,
@@ -552,7 +595,9 @@ async function main() {
       pegawai_id: pegawaiMap.get('197102151998031002'),
     },
   });
-  await prisma.user.upsert({
+  await syncUserRoles(userSiti.id, [roleKoordinator.id], roleKoordinator.id);
+
+  const userAndi = await prisma.user.upsert({
     where: { email: 'andi.pratama@kontrak.co.id' },
     update: { role_id: roleKaryawan.id, pegawai_id: pegawaiMap.get('TA-001') },
     create: {
@@ -563,7 +608,9 @@ async function main() {
       pegawai_id: pegawaiMap.get('TA-001'),
     },
   });
-  await prisma.user.upsert({
+  await syncUserRoles(userAndi.id, [roleKaryawan.id], roleKaryawan.id);
+
+  const userAgus = await prisma.user.upsert({
     where: { email: 'agus.wijaya@lemigas.esdm.go.id' },
     update: {
       role_id: roleKaryawan.id,
@@ -577,6 +624,11 @@ async function main() {
       pegawai_id: pegawaiMap.get('197503102002031003'),
     },
   });
+  await syncUserRoles(
+    userAgus.id,
+    [roleKaryawan.id, roleKoordinator.id],
+    roleKaryawan.id,
+  );
 
   // ─── Proyek (3) ────────────────────────────────────────────────────────
   const proyek1 = await prisma.proyek.upsert({

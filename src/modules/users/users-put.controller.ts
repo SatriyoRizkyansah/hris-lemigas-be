@@ -44,12 +44,14 @@ export class UsersPutController {
     if (!existing) throw new NotFoundException('User tidak ditemukan');
 
     let roleId: string | undefined;
+    let targetRoleKode: string | undefined;
     if (body.role) {
       const role = await this.prisma.role.findUnique({
         where: { kode: body.role },
       });
       if (!role) throw new BadRequestException('Role tidak ditemukan');
       roleId = role.id;
+      targetRoleKode = role.kode;
     }
 
     if (body.id_unit_kerja) {
@@ -83,8 +85,67 @@ export class UsersPutController {
       include: {
         role: { select: { id: true, kode: true, nama: true } },
         unit_kerja: { select: { id: true, nama_unit: true } },
+        userRoles: { include: { role: true } },
       },
     });
+
+    // Sync roles if provided
+    if (body.roles || body.role) {
+      const existingRoles = await this.prisma.userRole.findMany({
+        where: { user_id: id },
+        include: { role: true },
+      });
+      const defaultKode =
+        targetRoleKode ??
+        existingRoles.find((ur) => ur.is_default)?.role.kode ??
+        updated.role.kode;
+      let desiredKodes: string[];
+      if (body.roles) {
+        desiredKodes = Array.from(new Set([defaultKode, ...body.roles]));
+      } else if (body.role) {
+        desiredKodes = Array.from(
+          new Set([defaultKode, ...existingRoles.map((ur) => ur.role.kode)]),
+        );
+      } else {
+        desiredKodes = [];
+      }
+      // Ensure all desired roles exist
+      const desiredRoleMap = new Map<string, { id: string; kode: string }>();
+      for (const kode of desiredKodes) {
+        const r = await this.prisma.role.findUnique({ where: { kode } });
+        if (!r) throw new BadRequestException(`Role ${kode} tidak ditemukan`);
+        desiredRoleMap.set(kode, r);
+      }
+      // Remove roles not in desired
+      const desiredIds = new Set(
+        Array.from(desiredRoleMap.values()).map((r) => r.id),
+      );
+      for (const ur of existingRoles) {
+        if (!desiredIds.has(ur.role_id)) {
+          await this.prisma.userRole.delete({ where: { id: ur.id } });
+        }
+      }
+      // Upsert desired
+      for (const [kode, r] of desiredRoleMap.entries()) {
+        await this.prisma.userRole.upsert({
+          where: { user_id_role_id: { user_id: id, role_id: r.id } },
+          update: { is_default: kode === defaultKode },
+          create: {
+            user_id: id,
+            role_id: r.id,
+            is_default: kode === defaultKode,
+          },
+        });
+      }
+      // Ensure only one default
+      await this.prisma.userRole.updateMany({
+        where: {
+          user_id: id,
+          role_id: { not: desiredRoleMap.get(defaultKode)!.id },
+        },
+        data: { is_default: false },
+      });
+    }
 
     await this.audit.log({
       tabel: 'user',
@@ -109,12 +170,20 @@ export class UsersPutController {
   }
 
   private mapItem(item: any): UserItemDto {
+    const roles: string[] = item.userRoles?.length
+      ? item.userRoles.map((ur: any) => ur.role?.kode ?? '').filter(Boolean)
+      : [item.role?.kode ?? ''].filter(Boolean);
+    const rolesDetail =
+      item.userRoles?.map((ur: any) => ur.role).filter(Boolean) ??
+      (item.role ? [item.role] : []);
     return {
       id: item.id,
       email: item.email,
       nama: item.nama,
       role: item.role?.kode ?? '',
       nama_role: item.role?.nama ?? null,
+      roles,
+      roles_detail: rolesDetail,
       id_unit_kerja: item.unit_kerja?.id ?? null,
       nama_unit_kerja: item.unit_kerja?.nama_unit ?? null,
       status: item.status,

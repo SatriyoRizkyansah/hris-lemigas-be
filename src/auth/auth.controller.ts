@@ -39,6 +39,7 @@ export class AuthController {
       email: user.email,
       nama: user.nama,
       role: user.role,
+      roles: user.roles ?? [user.role],
       unitKerjaId: user.unitKerjaId ?? null,
     };
   }

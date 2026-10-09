@@ -6,6 +6,7 @@ export interface JwtPayload {
   nama: string;
   roleId: string;
   role: string;
+  roles?: string[];
   unitKerjaId?: string;
 }
 

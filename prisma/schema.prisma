@@ -72,7 +72,8 @@ model Role {
   nama      String  @db.VarChar(100)
   deskripsi String? @db.Text
 
-  users User[]
+  users     User[]
+  userRoles UserRole[]
 
   @@map("role")
 }
@@ -90,16 +91,33 @@ model User {
   status        StatusAktif @default(AKTIF)
   created_at    DateTime    @default(now())
   updated_at    DateTime    @updatedAt
+  created_by    String?     @db.Uuid
 
   role        Role       @relation(fields: [role_id], references: [id])
   pegawai     Pegawai?   @relation(fields: [pegawai_id], references: [id])
   unit_kerja  UnitKerja? @relation(fields: [unit_kerja_id], references: [id])
 
+  userRoles      UserRole[]
   alokasi_dibuat AlokasiGajiTA[]
   audit_log      AuditLog[]
 
   @@index([role_id])
   @@map("user")
+}
+
+model UserRole {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  role_id    String   @db.Uuid
+  is_default Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, role_id])
+  @@index([user_id])
+  @@map("user_role")
 }
 
 // ─── 2. ORGANISASI ─────────────────────────────────────────────────────────
