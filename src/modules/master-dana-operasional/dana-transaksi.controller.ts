@@ -32,14 +32,22 @@ export class DanaTransaksiController {
   ) {}
 
   @Get()
-  @ApiRoles('List transaksi dana', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('List transaksi dana', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   async list(@Param('id', ParseUUIDPipe) id: string) {
     const ledger = await this.fund.getDanaLedger(id);
     return ok('Berhasil mengambil transaksi dana', ledger);
   }
 
   @Post()
-  @ApiRoles('Tambah transaksi dana', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Tambah transaksi dana', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   async create(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: CreateDanaTransaksiDto,
@@ -63,7 +71,11 @@ export class DanaTransaksiController {
   }
 
   @Put(':tid')
-  @ApiRoles('Update transaksi dana', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Update transaksi dana', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   async update(
     @Param('tid', ParseUUIDPipe) tid: string,
     @Body() body: UpdateDanaTransaksiDto,
@@ -87,7 +99,11 @@ export class DanaTransaksiController {
   }
 
   @Delete(':tid')
-  @ApiRoles('Hapus transaksi dana', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Hapus transaksi dana', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   async remove(@Param('tid', ParseUUIDPipe) tid: string) {
     await this.prisma.danaTransaksi.delete({ where: { id: tid } });
     return deleted('Berhasil menghapus transaksi');

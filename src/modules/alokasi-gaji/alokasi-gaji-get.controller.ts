@@ -22,7 +22,11 @@ export class AlokasiGetController {
   ) {}
 
   @Get()
-  @ApiRoles('Get daftar alokasi gaji TA', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get daftar alokasi gaji TA', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponseArrayWithPagination(AlokasiItemDto)
   async getData(
     @CurrentUser() user: JwtPayload,
@@ -66,8 +70,8 @@ export class AlokasiGetController {
       where.pegawai = skFilter(scopedUnits);
     }
 
-    // Scope koordinator
-    if (user.role === Role.Koordinator) {
+    // Scope koordinator/keuangan: filter by unit scope
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId) {
         return paginated(
           'Berhasil mengambil data alokasi gaji TA',
@@ -81,11 +85,13 @@ export class AlokasiGetController {
         user.unitKerjaId,
       );
       const unitFilter = skFilter(scopedUnits);
-      where.pegawai = where.pegawai
-        ? {
-            AND: [where.pegawai as object, unitFilter],
-          }
-        : unitFilter;
+      if (where.pegawai) {
+        const existing = where.pegawai;
+        delete (where as any).pegawai;
+        (where as any).AND = [{ pegawai: existing }, { pegawai: unitFilter }];
+      } else {
+        where.pegawai = unitFilter;
+      }
     }
 
     const [items, total] = await Promise.all([

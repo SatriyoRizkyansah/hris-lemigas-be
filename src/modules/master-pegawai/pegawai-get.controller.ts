@@ -76,9 +76,13 @@ export class PegawaiGetController {
         user.unitKerjaId,
       );
       const unitFilter = skFilter(scopedUnits);
-      where.sk_list = (where as any).sk_list
-        ? { AND: [(where as any).sk_list as object, unitFilter] }
-        : unitFilter;
+      if ((where as any).sk_list) {
+        const existing = (where as any).sk_list;
+        delete (where as any).sk_list;
+        (where as any).AND = [{ sk_list: existing }, { sk_list: unitFilter }];
+      } else {
+        where.sk_list = unitFilter;
+      }
     }
 
     if (query.query) {

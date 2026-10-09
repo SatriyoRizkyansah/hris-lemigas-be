@@ -58,6 +58,7 @@ export class AlokasiRekapController {
   @ApiRoles('Rekap alokasi gaji TA bulanan', [
     Role.Superadmin,
     Role.Koordinator,
+    Role.Keuangan,
   ])
   @ApiStandartResponseArray(RekapItemDto)
   async getRekap(
@@ -163,6 +164,7 @@ export class AlokasiRekapController {
   @ApiRoles('Export rekap alokasi gaji TA ke Excel', [
     Role.Superadmin,
     Role.Koordinator,
+    Role.Keuangan,
   ])
   async exportRekap(
     @CurrentUser() user: JwtPayload,
@@ -343,10 +345,10 @@ export class AlokasiRekapController {
     user: JwtPayload,
     idUnitKerja?: string,
   ): Promise<string[] | null> {
-    if (user.role === Role.Koordinator) {
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId) {
         throw new ForbiddenException(
-          'Akun koordinator belum memiliki unit kerja',
+          'Akun koordinator/keuangan belum memiliki unit kerja',
         );
       }
       const scoped = await this.unitScope.getScopedUnitIds(user.unitKerjaId);

@@ -34,7 +34,11 @@ export class AlokasiDeleteController {
   ) {}
 
   @Delete(':id')
-  @ApiRoles('Batalkan alokasi gaji TA', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Batalkan alokasi gaji TA', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponse(AlokasiItemDto)
   async cancel(
     @CurrentUser() user: JwtPayload,
@@ -63,11 +67,11 @@ export class AlokasiDeleteController {
       throw new BadRequestException('Alokasi sudah dibatalkan');
     }
 
-    // Scope koordinator via SK homebase
-    if (user.role === Role.Koordinator) {
+    // Scope koordinator/keuangan via SK homebase
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId) {
         throw new ForbiddenException(
-          'Akun koordinator belum memiliki unit kerja',
+          'Akun koordinator/keuangan belum memiliki unit kerja',
         );
       }
       const unitId = (existing.pegawai as any).sk_list?.[0]?.unit_kerja_id;

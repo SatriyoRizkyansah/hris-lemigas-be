@@ -39,7 +39,11 @@ export class AlokasiPutController {
   ) {}
 
   @Put(':id')
-  @ApiRoles('Update alokasi gaji TA', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Update alokasi gaji TA', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponse(AlokasiItemDto)
   async update(
     @CurrentUser() user: JwtPayload,
@@ -71,11 +75,11 @@ export class AlokasiPutController {
       );
     }
 
-    // Scope koordinator via SK homebase
-    if (user.role === Role.Koordinator) {
+    // Scope koordinator/keuangan via SK homebase
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId) {
         throw new ForbiddenException(
-          'Akun koordinator belum memiliki unit kerja',
+          'Akun koordinator/keuangan belum memiliki unit kerja',
         );
       }
       const unitId = (existing.pegawai as any).sk_list?.[0]?.unit_kerja_id;

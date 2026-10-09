@@ -36,17 +36,21 @@ export class AlokasiPostController {
   ) {}
 
   @Post()
-  @ApiRoles('Buat alokasi gaji TA', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Buat alokasi gaji TA', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponseCreate(AlokasiItemDto)
   async create(
     @CurrentUser() user: JwtPayload,
     @Body() body: CreateAlokasiDto,
   ) {
-    // Scope koordinator: pegawai harus dalam lingkup unit miliknya
-    if (user.role === Role.Koordinator) {
+    // Scope koordinator/keuangan: pegawai harus dalam lingkup unit miliknya
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId) {
         throw new ForbiddenException(
-          'Akun koordinator belum memiliki unit kerja',
+          'Akun koordinator/keuangan belum memiliki unit kerja',
         );
       }
       const skHomebase = await this.prisma.sk.findFirst({

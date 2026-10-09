@@ -73,7 +73,11 @@ export class DanaOperasionalController {
   ) {}
 
   @Get()
-  @ApiRoles('Get daftar dana operasional', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get daftar dana operasional', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponseArrayWithPagination(DanaOperasionalItemDto)
   async getData(
     @CurrentUser() user: JwtPayload,
@@ -84,8 +88,8 @@ export class DanaOperasionalController {
       where.unit_koordinator_id = query.id_unit_koordinator;
     if (query.tahun_fiscal) where.tahun_fiscal = query.tahun_fiscal;
 
-    // Koordinator: hanya dana operasional unit dalam scope
-    if (user.role === Role.Koordinator) {
+    // Koordinator/Keuangan: hanya dana operasional unit dalam scope
+    if (user.role === Role.Koordinator || user.role === Role.Keuangan) {
       if (!user.unitKerjaId) {
         return paginated(
           'Berhasil mengambil data dana operasional',
@@ -131,7 +135,11 @@ export class DanaOperasionalController {
   }
 
   @Get(':id')
-  @ApiRoles('Get detail dana operasional', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get detail dana operasional', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponse(DanaOperasionalItemDto)
   async getDetail(
     @CurrentUser() user: JwtPayload,
@@ -145,7 +153,10 @@ export class DanaOperasionalController {
     });
     if (!item) throw new NotFoundException('Dana operasional tidak ditemukan');
 
-    if (user.role === Role.Koordinator && user.unitKerjaId) {
+    if (
+      (user.role === Role.Koordinator || user.role === Role.Keuangan) &&
+      user.unitKerjaId
+    ) {
       const inScope = await this.unitScope.isUnitInScope(
         item.unit_koordinator_id,
         user.unitKerjaId,
@@ -176,7 +187,11 @@ export class DanaOperasionalController {
   }
 
   @Get(':id/ledger')
-  @ApiRoles('Get ledger Dana Operasional', [Role.Superadmin, Role.Koordinator])
+  @ApiRoles('Get ledger Dana Operasional', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
   @ApiStandartResponse()
   async getLedger(
     @CurrentUser() user: JwtPayload,
@@ -186,7 +201,10 @@ export class DanaOperasionalController {
       where: { id },
     });
     if (!dana) throw new NotFoundException('Dana operasional tidak ditemukan');
-    if (user.role === Role.Koordinator && user.unitKerjaId) {
+    if (
+      (user.role === Role.Koordinator || user.role === Role.Keuangan) &&
+      user.unitKerjaId
+    ) {
       const inScope = await this.unitScope.isUnitInScope(
         dana.unit_koordinator_id,
         user.unitKerjaId,

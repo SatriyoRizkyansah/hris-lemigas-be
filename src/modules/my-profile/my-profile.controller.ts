@@ -26,6 +26,7 @@ export class MyProfileController {
     Role.Superadmin,
     Role.Koordinator,
     Role.Karyawan,
+    Role.Keuangan,
   ])
   async getProfile(@CurrentUser() user: JwtPayload) {
     const userData = await this.prisma.user.findUnique({
