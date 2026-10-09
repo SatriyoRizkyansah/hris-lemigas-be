@@ -724,43 +724,101 @@ async function main() {
     },
   });
 
-  // ─── Dana Operasional — 5 Kamar Margin (realistic wallets for UI dropdowns) ─
-  // unitKor1 = KP3 (testing) → P2_KP3 30jt + OPS_KP3 2.5jt
-  // unitKor3 = Bagian Umum → OPS_KANTOR 17jt
-  // unitKor2 = Kepegawaian → P1_PNS_NON_PNS 48jt
-  // (MULOS_SPI 2.5% akan terisi via distribusi-margin endpoint)
-  const danaWallets: Array<{
+  // ─── PengaturanMargin — 5 BLU buckets (Dynamic Master Configuration) ─
+  // P1 48% → unitKor2 (Kepegawaian), P2 30% → unitKor1 (KP3), OPS_KANTOR 17% → unitKor3 (Umum)
+  // OPS_KP3 2.5% → unitKor1, MULOS_SPI 2.5% → unitKor4 (SPI dummy, fallback to unitKor1 if not exists)
+  const spiUnit = await prisma.unitKerja.findFirst({
+    where: { kode_unit: 'KOR-04' },
+  });
+  const spiUnitId = spiUnit?.id ?? unitKor1.id;
+  const pengaturanMarginData: Array<{
+    kategori:
+      'P1_PNS_NON_PNS' | 'P2_KP3' | 'OPS_KANTOR' | 'OPS_KP3' | 'MULOS_SPI';
+    nama: string;
+    pct: number;
     unitId: string;
-    kategori: 'P1_PNS_NON_PNS' | 'P2_KP3' | 'OPS_KANTOR' | 'OPS_KP3';
-    plafon: number;
   }> = [
-    { unitId: unitKor1.id, kategori: 'P2_KP3', plafon: 30000000 },
-    { unitId: unitKor1.id, kategori: 'OPS_KP3', plafon: 2500000 },
-    { unitId: unitKor3.id, kategori: 'OPS_KANTOR', plafon: 17000000 },
-    { unitId: unitKor2.id, kategori: 'P1_PNS_NON_PNS', plafon: 48000000 },
+    {
+      kategori: 'P1_PNS_NON_PNS',
+      nama: 'P1 PNS & Non-PNS',
+      pct: 48,
+      unitId: unitKor2.id,
+    },
+    { kategori: 'P2_KP3', nama: 'P2 KP3', pct: 30, unitId: unitKor1.id },
+    {
+      kategori: 'OPS_KANTOR',
+      nama: 'OPS Kantor',
+      pct: 17,
+      unitId: unitKor3.id,
+    },
+    { kategori: 'OPS_KP3', nama: 'OPS KP3', pct: 2.5, unitId: unitKor1.id },
+    { kategori: 'MULOS_SPI', nama: 'Mulos SPI', pct: 2.5, unitId: spiUnitId },
   ];
-  for (const w of danaWallets) {
-    await prisma.danaOperasional.upsert({
-      where: {
-        unit_koordinator_id_tahun_fiscal_kategori_kamar: {
-          unit_koordinator_id: w.unitId,
-          tahun_fiscal: 2026,
-          kategori_kamar: w.kategori,
-        },
+  for (const pm of pengaturanMarginData) {
+    await prisma.pengaturanMargin.upsert({
+      where: { kategori_kamar: pm.kategori },
+      update: {
+        nama_kamar: pm.nama,
+        persentase: pm.pct,
+        unit_kerja_id: pm.unitId,
       },
-      update: { total_plafon: w.plafon },
       create: {
-        unit_koordinator_id: w.unitId,
-        tahun_fiscal: 2026,
-        kategori_kamar: w.kategori,
-        total_plafon: w.plafon,
+        kategori_kamar: pm.kategori,
+        nama_kamar: pm.nama,
+        persentase: pm.pct,
+        unit_kerja_id: pm.unitId,
       },
     });
   }
-  // cleanup legacy LAINNYA dummy wallets if they exist
+  // cleanup legacy LAINNYA wallets — DanaOperasional now only via auto-distribution
   await prisma.danaOperasional.deleteMany({
     where: { tahun_fiscal: 2026, kategori_kamar: 'LAINNYA' },
   });
+  // Auto-generate initial DanaOperasional wallets via distribution logic (100jt dummy margin from PRJ-2026-01)
+  // so alokasi seeding has wallets to reference without manual LAINNYA seeding
+  const dummyMargin = 100000000;
+  for (const pm of pengaturanMarginData) {
+    const amount = Math.round((pm.pct / 100) * dummyMargin);
+    const existing = await prisma.danaOperasional.findFirst({
+      where: {
+        unit_koordinator_id: pm.unitId,
+        tahun_fiscal: 2026,
+        kategori_kamar: pm.kategori,
+      },
+    });
+    let wallet: { id: string };
+    if (existing) {
+      wallet = await prisma.danaOperasional.update({
+        where: { id: existing.id },
+        data: { total_plafon: amount },
+      });
+    } else {
+      wallet = await prisma.danaOperasional.create({
+        data: {
+          unit_koordinator_id: pm.unitId,
+          tahun_fiscal: 2026,
+          kategori_kamar: pm.kategori,
+          total_plafon: amount,
+        },
+      });
+    }
+    // track source proyek for audit trail
+    await prisma.danaTransaksi.upsert({
+      where: {
+        id: `00000000-0000-0000-0000-00000000000${pengaturanMarginData.indexOf(pm) + 1}`,
+      },
+      update: {},
+      create: {
+        dana_id: wallet.id,
+        proyek_id: proyek1.id,
+        nama_kegiatan: `Injeksi Margin dari Proyek ${proyek1.kode_proyek}`,
+        debit: amount,
+        kredit: 0,
+        tanggal: new Date('2026-01-15'),
+        keterangan: `Seed distribusi awal ${pm.kategori} (${pm.pct}%)`,
+      },
+    });
+  }
 
   // ─── Alokasi Gaji TA (5 TA, termasuk satu split 60/40) ────────────────
   const pembuatKor1 = await prisma.user.findUnique({

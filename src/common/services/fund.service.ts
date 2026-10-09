@@ -115,6 +115,9 @@ export class FundService {
   async getDanaLedger(danaId: string) {
     const list = await this.prisma.danaTransaksi.findMany({
       where: { dana_id: danaId },
+      include: {
+        proyek: { select: { id: true, kode_proyek: true, nama_proyek: true } },
+      },
       orderBy: [{ tanggal: 'asc' }, { created_at: 'asc' }],
     });
     const total_debit = list.reduce(

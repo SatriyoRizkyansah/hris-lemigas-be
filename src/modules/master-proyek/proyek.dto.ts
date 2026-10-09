@@ -42,6 +42,30 @@ export class CreateProyekDto {
   @IsOptional()
   @EmptyToUndefined()
   sumber_pendanaan?: string;
+
+  @ApiPropertyOptional({
+    example: 1000000000,
+    description: 'Nilai kontrak total',
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  nilai_kontrak?: number;
+
+  @ApiPropertyOptional({ example: 750000000, description: 'Total direct cost' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  total_direct_cost?: number;
+
+  @ApiPropertyOptional({
+    example: 250000000,
+    description: 'Total margin yang akan didistribusikan ke 5 kamar',
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  total_margin?: number;
 }
 
 export class UpdateProyekDto {
@@ -62,6 +86,24 @@ export class UpdateProyekDto {
   @IsOptional()
   @EmptyToUndefined()
   sumber_pendanaan?: string;
+
+  @ApiPropertyOptional({ example: 1000000000 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  nilai_kontrak?: number;
+
+  @ApiPropertyOptional({ example: 750000000 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  total_direct_cost?: number;
+
+  @ApiPropertyOptional({ example: 250000000 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  total_margin?: number;
 }
 
 export class ProyekItemDto {
@@ -79,6 +121,15 @@ export class ProyekItemDto {
 
   @ApiPropertyOptional({ nullable: true })
   sumber_pendanaan?: string | null;
+
+  @ApiPropertyOptional({ example: 1000000000 })
+  nilai_kontrak?: number;
+
+  @ApiPropertyOptional({ example: 750000000 })
+  total_direct_cost?: number;
+
+  @ApiPropertyOptional({ example: 250000000 })
+  total_margin?: number;
 
   @ApiPropertyOptional()
   jumlah_ro?: number;

@@ -29,6 +29,7 @@ import type { JwtPayload } from '../../auth/user.decorator.js';
 import { Role } from '../../common/enums/role.enum.js';
 import { AuditService } from '../../common/services/audit.service.js';
 import { AksiAudit } from '../../common/enums/hris.enum.js';
+import { FundDistributionService } from '../../common/services/fund-distribution.service.js';
 import {
   ok,
   created,
@@ -49,6 +50,7 @@ export class ProyekController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly fundDistribution: FundDistributionService,
   ) {}
 
   @Get()
@@ -87,7 +89,10 @@ export class ProyekController {
       kode_proyek: p.kode_proyek,
       nama_proyek: p.nama_proyek,
       tahun_fiscal: p.tahun_fiscal,
-      sumber_pendanaan: p.sumber_pendanaan ?? null,
+      sumber_pendanaan: (p as any).sumber_pendanaan ?? null,
+      nilai_kontrak: (p as any).nilai_kontrak ?? 0,
+      total_direct_cost: (p as any).total_direct_cost ?? 0,
+      total_margin: (p as any).total_margin ?? 0,
       jumlah_ro: p._count.ro_list,
       total_plafon_ro: p.ro_list.reduce((acc, ro) => acc + ro.total_plafon, 0),
       created_at: p.created_at,
@@ -125,7 +130,10 @@ export class ProyekController {
       kode_proyek: proyek.kode_proyek,
       nama_proyek: proyek.nama_proyek,
       tahun_fiscal: proyek.tahun_fiscal,
-      sumber_pendanaan: proyek.sumber_pendanaan ?? null,
+      sumber_pendanaan: (proyek as any).sumber_pendanaan ?? null,
+      nilai_kontrak: (proyek as any).nilai_kontrak ?? 0,
+      total_direct_cost: (proyek as any).total_direct_cost ?? 0,
+      total_margin: (proyek as any).total_margin ?? 0,
       jumlah_ro: proyek._count.ro_list,
       total_plafon_ro: proyek.ro_list.reduce(
         (acc, ro) => acc + ro.total_plafon,
@@ -149,13 +157,33 @@ export class ProyekController {
       );
     }
 
-    const proyek = await this.prisma.proyek.create({
-      data: {
-        kode_proyek: body.kode_proyek,
-        nama_proyek: body.nama_proyek,
-        tahun_fiscal: body.tahun_fiscal,
-        sumber_pendanaan: body.sumber_pendanaan ?? null,
-      },
+    const totalMargin = body.total_margin ?? 0;
+    const nilaiKontrak = body.nilai_kontrak ?? 0;
+    const directCost = body.total_direct_cost ?? 0;
+
+    // Atomic: INSERT Proyek + distribute margin via PengaturanMargin
+    const proyek = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.proyek.create({
+        data: {
+          kode_proyek: body.kode_proyek,
+          nama_proyek: body.nama_proyek,
+          tahun_fiscal: body.tahun_fiscal,
+          sumber_pendanaan: body.sumber_pendanaan ?? null,
+          nilai_kontrak: nilaiKontrak,
+          total_direct_cost: directCost,
+          total_margin: totalMargin,
+        } as any,
+      });
+      if (totalMargin > 0) {
+        await this.fundDistribution.distributeMargin(
+          created.id,
+          body.tahun_fiscal,
+          totalMargin,
+          user.sub,
+          tx as any,
+        );
+      }
+      return created;
     });
 
     await this.audit.log({
@@ -163,7 +191,7 @@ export class ProyekController {
       recordId: proyek.id,
       aksi: AksiAudit.CREATE,
       dilakukanOleh: user.sub,
-      dataSesudah: proyek,
+      dataSesudah: proyek as any,
     });
 
     return created('Berhasil menambahkan proyek', proyek);
@@ -192,7 +220,16 @@ export class ProyekController {
         ...(body.sumber_pendanaan !== undefined && {
           sumber_pendanaan: body.sumber_pendanaan,
         }),
-      },
+        ...(body.nilai_kontrak !== undefined && {
+          nilai_kontrak: body.nilai_kontrak,
+        }),
+        ...(body.total_direct_cost !== undefined && {
+          total_direct_cost: body.total_direct_cost,
+        }),
+        ...(body.total_margin !== undefined && {
+          total_margin: body.total_margin,
+        }),
+      } as any,
     });
 
     await this.audit.log({
@@ -205,6 +242,48 @@ export class ProyekController {
     });
 
     return ok('Berhasil mengupdate proyek', proyek);
+  }
+
+  @Get(':id/distribusi')
+  @ApiRoles('Get distribusi margin proyek', [
+    Role.Superadmin,
+    Role.Koordinator,
+    Role.Keuangan,
+  ])
+  async getDistribusi(@Param('id', ParseUUIDPipe) id: string) {
+    const proyek = await this.prisma.proyek.findUnique({ where: { id } });
+    if (!proyek) throw new NotFoundException('Proyek tidak ditemukan');
+    const list = await this.prisma.danaTransaksi.findMany({
+      where: { proyek_id: id },
+      include: {
+        dana: {
+          select: { id: true, kategori_kamar: true, unit_koordinator_id: true },
+        },
+        proyek: { select: { id: true, kode_proyek: true, nama_proyek: true } },
+      },
+      orderBy: [{ tanggal: 'asc' }, { created_at: 'asc' }],
+    });
+    // enrich with unit name
+    const unitIds = [
+      ...new Set(
+        list.map((r: any) => r.dana?.unit_koordinator_id).filter(Boolean),
+      ),
+    ];
+    const units = unitIds.length
+      ? await this.prisma.unitKerja.findMany({
+          where: { id: { in: unitIds } },
+          select: { id: true, nama_unit: true, kode_unit: true },
+        })
+      : [];
+    const unitMap = new Map(units.map((u) => [u.id, u]));
+    const enriched = list.map((r: any) => ({
+      ...r,
+      dana_kategori: r.dana?.kategori_kamar ?? null,
+      unit: r.dana?.unit_koordinator_id
+        ? (unitMap.get(r.dana.unit_koordinator_id) ?? null)
+        : null,
+    }));
+    return ok('Berhasil mengambil distribusi margin proyek', enriched);
   }
 
   @Delete(':id')

@@ -16,6 +16,7 @@ import { UsersModule } from './modules/users/users.module.js';
 import { MyProfileModule } from './modules/my-profile/my-profile.module.js';
 import { FileModule } from './modules/file/file.module.js';
 import { FinanceModule } from './modules/finance/finance.module.js';
+import { PengaturanMarginModule } from './modules/pengaturan-margin/pengaturan-margin.module.js';
 import { HealthController } from './health.controller.js';
 
 @Module({
@@ -35,6 +36,7 @@ import { HealthController } from './health.controller.js';
     MyProfileModule,
     FileModule,
     FinanceModule,
+    PengaturanMarginModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

@@ -143,6 +143,7 @@ model UnitKerja {
   ro_list          Ro[]
   dana_operasional DanaOperasional[]
   user_koordinator User[]
+  pengaturan_margin_list PengaturanMargin[]
 
   @@index([parent_unit_id])
   @@index([tipe_unit])
@@ -219,18 +220,36 @@ model Sk {
 // ─── 5. PROYEK & RO ────────────────────────────────────────────────────────
 
 model Proyek {
-  id               String   @id @default(uuid()) @db.Uuid
-  kode_proyek      String   @unique @db.VarChar(50)
-  nama_proyek      String   @db.VarChar(200)
-  tahun_fiscal     Int
-  sumber_pendanaan String?  @db.VarChar(150)
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  id                String   @id @default(uuid()) @db.Uuid
+  kode_proyek       String   @unique @db.VarChar(50)
+  nama_proyek       String   @db.VarChar(200)
+  tahun_fiscal      Int
+  sumber_pendanaan  String?  @db.VarChar(150)
+  nilai_kontrak     Int      @default(0)
+  total_direct_cost Int      @default(0)
+  total_margin      Int      @default(0)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
 
-  ro_list Ro[]
+  ro_list              Ro[]
+  dana_transaksi_list  DanaTransaksi[]
 
   @@index([tahun_fiscal])
   @@map("proyek")
+}
+
+model PengaturanMargin {
+  id            String       @id @default(uuid()) @db.Uuid
+  kategori_kamar KategoriKamar @unique
+  nama_kamar    String       @db.VarChar(150)
+  persentase    Float
+  unit_kerja_id String       @db.Uuid
+  updated_at    DateTime     @updatedAt
+
+  unit_kerja UnitKerja @relation(fields: [unit_kerja_id], references: [id])
+
+  @@index([unit_kerja_id])
+  @@map("pengaturan_margin")
 }
 
 model Ro {
@@ -309,6 +328,7 @@ model DanaOperasional {
 model DanaTransaksi {
   id            String   @id @default(uuid()) @db.Uuid
   dana_id       String   @db.Uuid
+  proyek_id     String?  @db.Uuid
   nama_kegiatan String   @db.VarChar(200)
   no_kuitansi   String?  @db.VarChar(100)
   tanggal       DateTime @db.Date
@@ -318,9 +338,11 @@ model DanaTransaksi {
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
-  dana DanaOperasional @relation(fields: [dana_id], references: [id], onDelete: Cascade)
+  dana   DanaOperasional @relation(fields: [dana_id], references: [id], onDelete: Cascade)
+  proyek Proyek?         @relation(fields: [proyek_id], references: [id], onDelete: SetNull)
 
   @@index([dana_id])
+  @@index([proyek_id])
   @@index([tanggal])
   @@map("dana_transaksi")
 }
