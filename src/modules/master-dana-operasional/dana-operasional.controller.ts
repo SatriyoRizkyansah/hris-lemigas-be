@@ -137,7 +137,7 @@ export class DanaOperasionalController {
     const data = await Promise.all(
       items.map(async (item) => {
         const balance = await this.fund.getOperationalBalance(item.id);
-        return this.mapItem(item, balance.total_terpakai);
+        return this.mapItem(item, balance);
       }),
     );
 
@@ -193,7 +193,7 @@ export class DanaOperasionalController {
       take: 50,
     });
     return ok('Berhasil mengambil detail dana operasional', {
-      ...this.mapItem(item, balance.total_terpakai),
+      ...this.mapItem(item, balance),
       transaksi_list: ledger.list,
       total_debit: ledger.total_debit,
       total_kredit: ledger.total_kredit,
@@ -291,7 +291,10 @@ export class DanaOperasionalController {
 
     return created(
       'Berhasil menambahkan dana operasional',
-      this.mapItem(item, 0),
+      this.mapItem(item, {
+        total_terpakai: 0,
+        sisa_saldo: item.total_plafon,
+      }),
     );
   }
 
@@ -343,7 +346,7 @@ export class DanaOperasionalController {
     const balance = await this.fund.getOperationalBalance(id);
     return ok(
       'Berhasil mengupdate dana operasional',
-      this.mapItem(item, balance.total_terpakai),
+      this.mapItem(item, balance),
     );
   }
 
@@ -380,13 +383,16 @@ export class DanaOperasionalController {
     return deleted('Berhasil menghapus dana operasional');
   }
 
-  private mapItem(item: any, totalTerpakai: number): DanaOperasionalItemDto {
+  private mapItem(
+    item: any,
+    balance: { total_terpakai?: number; sisa_saldo?: number },
+  ): DanaOperasionalItemDto {
     return {
       id: item.id,
       tahun_fiscal: item.tahun_fiscal,
       total_plafon: item.total_plafon,
-      total_terpakai: totalTerpakai,
-      sisa_saldo: item.total_plafon,
+      total_terpakai: balance.total_terpakai ?? 0,
+      sisa_saldo: balance.sisa_saldo ?? item.total_plafon,
       id_unit_koordinator: item.unit_koordinator?.id ?? null,
       nama_unit_koordinator: item.unit_koordinator?.nama_unit ?? null,
       kategori_kamar: item.kategori_kamar ?? 'LAINNYA',

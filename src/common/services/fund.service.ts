@@ -48,8 +48,8 @@ export class FundService {
   }
 
   /**
-   * Saldo dana operasional: sisa = total_plafon (sudah decrement+increment distribusi),
-   * terpakai = alokasi aktif. trx_debit/kredit untuk ledger info.
+   * Saldo dana operasional: total_plafon adalah saldo tersimpan setelah alokasi
+   * dan distribusi. Transaksi debit mengurangi saldo; transaksi kredit menambahnya.
    */
   async getOperationalBalance(danaOperasionalId: string) {
     const dana = await this.prisma.danaOperasional.findUnique({
@@ -71,7 +71,10 @@ export class FundService {
     const alokasi_terpakai = terpakai._sum.jumlah ?? 0;
     const trx_debit = trxAgg._sum.debit ?? 0;
     const trx_kredit = trxAgg._sum.kredit ?? 0;
-    const total_terpakai = alokasi_terpakai;
+    // total_plafon menjadi batas dana; alokasi tidak dijumlahkan lagi karena
+    // alokasi sudah mengurangi saldo tersimpan pada saat dibuat.
+    const total_terpakai = Math.max(0, trx_debit - trx_kredit);
+    const sisa_saldo = dana.total_plafon - total_terpakai;
 
     return {
       id: dana.id,
@@ -79,7 +82,7 @@ export class FundService {
       tahun_fiscal: dana.tahun_fiscal,
       total_plafon: dana.total_plafon,
       total_terpakai,
-      sisa_saldo: dana.total_plafon,
+      sisa_saldo,
       alokasi_terpakai,
       trx_debit,
       trx_kredit,
