@@ -199,6 +199,9 @@ export class RoItemDto {
   @ApiPropertyOptional({ nullable: true })
   file_rab?: string | null;
 
+  @ApiPropertyOptional({ nullable: true })
+  file_sk?: string | null;
+
   @ApiPropertyOptional()
   status_ro?: string;
 

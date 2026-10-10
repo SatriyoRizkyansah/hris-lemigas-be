@@ -211,6 +211,27 @@ export class RoController {
     return ok('Berhasil upload RAB', updated);
   }
 
+  @Post(':id/sk')
+  @ApiRoles('Upload SK RO', [Role.Superadmin, Role.Koordinator])
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadSk(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: any,
+  ) {
+    const ro = await this.prisma.ro.findUnique({ where: { id } });
+    if (!ro) throw new NotFoundException('RO tidak ditemukan');
+    const path = await this.fileService.uploadSk({
+      originalname: file.originalname,
+      buffer: file.buffer,
+    });
+    if ((ro as any).file_sk) await this.fileService.delete((ro as any).file_sk);
+    const updated = await this.prisma.ro.update({
+      where: { id },
+      data: { file_sk: path } as any,
+    });
+    return ok('Berhasil upload SK', updated);
+  }
+
   @Post()
   @ApiRoles('Tambah RO', [Role.Superadmin])
   @ApiStandartResponseCreate(RoItemDto)
@@ -290,7 +311,7 @@ export class RoController {
   }
 
   @Put(':id')
-  @ApiRoles('Update RO', [Role.Superadmin])
+  @ApiRoles('Update RO', [Role.Superadmin, Role.Koordinator])
   @ApiStandartResponse(RoItemDto)
   async update(
     @CurrentUser() user: JwtPayload,
@@ -299,6 +320,18 @@ export class RoController {
   ) {
     const existing = await this.prisma.ro.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('RO tidak ditemukan');
+
+    // Koordinator hanya boleh lengkapi RO milik unit dalam scope-nya
+    if (user.role === Role.Koordinator) {
+      if (!user.unitKerjaId)
+        throw new BadRequestException('Unit kerja tidak ditemukan pada token');
+      const inScope = await this.unitScope.isUnitInScope(
+        existing.unit_koordinator_id,
+        user.unitKerjaId,
+      );
+      if (!inScope)
+        throw new BadRequestException('Anda tidak memiliki akses ke RO ini');
+    }
 
     // Validasi plafon baru tidak kurang dari yang sudah terpakai
     if (body.total_plafon !== undefined) {
@@ -427,6 +460,7 @@ export class RoController {
       no_kontrak: ro.no_kontrak ?? null,
       pj: ro.pj ?? null,
       file_rab: ro.file_rab ?? null,
+      file_sk: (ro as any).file_sk ?? null,
       status_ro: ro.status_ro ?? 'AKTIF',
       no_sk: ro.no_sk ?? null,
       mulai_sk: ro.mulai_sk ?? null,

@@ -263,6 +263,7 @@ model Ro {
   no_kontrak          String?  @db.VarChar(100)
   pj                  String?  @db.VarChar(150)
   file_rab            String?  @db.VarChar(500)
+  file_sk             String?  @db.VarChar(500)
   status_ro           StatusRo @default(AKTIF)
   no_sk               String?  @db.VarChar(100)
   mulai_sk            DateTime? @db.Date
