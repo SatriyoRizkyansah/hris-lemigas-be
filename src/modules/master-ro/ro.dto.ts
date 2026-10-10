@@ -56,6 +56,12 @@ export class CreateRoDto {
   @IsUUID()
   id_unit_koordinator: string;
 
+  @ApiPropertyOptional({ description: 'ID rekening fisik sumber saldo RO' })
+  @IsUUID()
+  @IsOptional()
+  @EmptyToUndefined()
+  id_rekening?: string;
+
   @ApiProperty({ example: 2026 })
   @IsInt()
   @Min(2000)
@@ -112,6 +118,12 @@ export class UpdateRoDto {
   @IsOptional()
   @EmptyToUndefined()
   nama_ro?: string;
+
+  @ApiPropertyOptional({ description: 'ID rekening fisik sumber saldo RO' })
+  @IsUUID()
+  @IsOptional()
+  @EmptyToUndefined()
+  id_rekening?: string;
 
   @ApiPropertyOptional()
   @IsInt()

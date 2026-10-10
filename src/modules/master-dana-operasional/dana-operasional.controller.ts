@@ -272,6 +272,7 @@ export class DanaOperasionalController {
     const item = await this.prisma.danaOperasional.create({
       data: {
         unit_koordinator_id: body.id_unit_koordinator,
+        rekening_id: body.id_rekening ?? null,
         tahun_fiscal: body.tahun_fiscal,
         kategori_kamar: kategori as any,
         total_plafon: body.total_plafon,
@@ -327,6 +328,9 @@ export class DanaOperasionalController {
       data: {
         ...(body.total_plafon !== undefined && {
           total_plafon: body.total_plafon,
+        }),
+        ...(body.id_rekening !== undefined && {
+          rekening_id: body.id_rekening,
         }),
       },
       include: {

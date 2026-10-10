@@ -47,6 +47,11 @@ enum StatusAlokasi {
   DIBATALKAN
 }
 
+enum StatusRekonsiliasi {
+  MATCHED
+  UNMATCHED
+}
+
 enum AksiAudit {
   CREATE
   UPDATE
@@ -97,9 +102,10 @@ model User {
   pegawai     Pegawai?   @relation(fields: [pegawai_id], references: [id])
   unit_kerja  UnitKerja? @relation(fields: [unit_kerja_id], references: [id])
 
-  userRoles      UserRole[]
-  alokasi_dibuat AlokasiGajiTA[]
-  audit_log      AuditLog[]
+  userRoles                 UserRole[]
+  alokasi_dibuat            AlokasiGajiTA[]
+  audit_log                 AuditLog[]
+  rekonsiliasi_diperiksa    RekonsiliasiBank[]
 
   @@index([role_id])
   @@map("user")
@@ -219,6 +225,47 @@ model Sk {
 
 // ─── 5. PROYEK & RO ────────────────────────────────────────────────────────
 
+model MasterRekening {
+  id              String      @id @default(uuid()) @db.Uuid
+  nama_bank       String      @db.VarChar(100)
+  nomor_rekening  String      @unique @db.VarChar(100)
+  nama_rekening   String      @db.VarChar(200)
+  status_aktif    StatusAktif @default(AKTIF)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  ro_list            Ro[]
+  dana_operasional_list DanaOperasional[]
+  rekonsiliasi_list   RekonsiliasiBank[]
+
+  @@index([status_aktif])
+  @@map("master_rekening")
+}
+
+model RekonsiliasiBank {
+  id                    String              @id @default(uuid()) @db.Uuid
+  rekening_id            String              @db.Uuid
+  tanggal_rekonsiliasi   DateTime            @db.Date
+  tahun_fiscal           Int
+  saldo_sistem           Int
+  saldo_bank             Int
+  selisih                Int
+  status                 StatusRekonsiliasi
+  keterangan             String?             @db.VarChar(500)
+  diperiksa_oleh         String              @db.Uuid
+  created_at             DateTime            @default(now())
+  updated_at             DateTime            @updatedAt
+
+  rekening  MasterRekening @relation(fields: [rekening_id], references: [id])
+  pemeriksa User           @relation(fields: [diperiksa_oleh], references: [id])
+
+  @@unique([rekening_id, tanggal_rekonsiliasi])
+  @@index([tahun_fiscal])
+  @@index([tanggal_rekonsiliasi])
+  @@index([diperiksa_oleh])
+  @@map("rekonsiliasi_bank")
+}
+
 model Proyek {
   id                String   @id @default(uuid()) @db.Uuid
   kode_proyek       String   @unique @db.VarChar(50)
@@ -258,6 +305,7 @@ model Ro {
   nama_ro             String   @db.VarChar(200)
   proyek_id           String   @db.Uuid
   unit_koordinator_id String   @db.Uuid
+  rekening_id         String?  @db.Uuid
   tahun_fiscal        Int
   total_plafon        Int      @default(0)
   no_kontrak          String?  @db.VarChar(100)
@@ -271,8 +319,9 @@ model Ro {
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
 
-  proyek           Proyek    @relation(fields: [proyek_id], references: [id])
-  unit_koordinator UnitKerja @relation(fields: [unit_koordinator_id], references: [id])
+  proyek           Proyek          @relation(fields: [proyek_id], references: [id])
+  unit_koordinator UnitKerja       @relation(fields: [unit_koordinator_id], references: [id])
+  rekening         MasterRekening? @relation(fields: [rekening_id], references: [id])
 
   alokasi_list   AlokasiGajiTA[]
   transaksi_list RoTransaksi[]
@@ -308,6 +357,7 @@ model RoTransaksi {
 model DanaOperasional {
   id                  String   @id @default(uuid()) @db.Uuid
   unit_koordinator_id String   @db.Uuid
+  rekening_id         String?  @db.Uuid
   tahun_fiscal        Int
   total_plafon        Int      @default(0)
   // NEW FIELD – kategori_kamar
@@ -316,7 +366,8 @@ model DanaOperasional {
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
 
-  unit_koordinator UnitKerja @relation(fields: [unit_koordinator_id], references: [id])
+  unit_koordinator UnitKerja       @relation(fields: [unit_koordinator_id], references: [id])
+  rekening         MasterRekening? @relation(fields: [rekening_id], references: [id])
 
   alokasi_list     AlokasiGajiTA[]
   transaksi_list   DanaTransaksi[]

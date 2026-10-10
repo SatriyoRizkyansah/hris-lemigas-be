@@ -280,6 +280,7 @@ export class RoController {
         nama_ro: body.nama_ro,
         proyek_id: body.id_proyek,
         unit_koordinator_id: body.id_unit_koordinator,
+        rekening_id: body.id_rekening ?? null,
         tahun_fiscal: body.tahun_fiscal,
         total_plafon: body.total_plafon,
         no_kontrak: (body as any).no_kontrak ?? null,
@@ -368,6 +369,9 @@ export class RoController {
         ...(body.nama_ro !== undefined && { nama_ro: body.nama_ro }),
         ...(body.total_plafon !== undefined && {
           total_plafon: body.total_plafon,
+        }),
+        ...(body.id_rekening !== undefined && {
+          rekening_id: body.id_rekening,
         }),
         ...((body as any).no_kontrak !== undefined && {
           no_kontrak: (body as any).no_kontrak,

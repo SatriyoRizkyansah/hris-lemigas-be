@@ -185,4 +185,50 @@ export class FundService {
       }
     }
   }
+
+  /**
+   * Kas virtual global untuk rekonsiliasi fase 1.
+   * RO aktif memakai plafon tersisa. Dana operasional memakai plafon dikurangi
+   * mutasi debit neto, karena alokasi sudah mengubah plafon tersimpan.
+   */
+  async calculateTotalSaldoSistem(tahunFiscal: number, rekeningId?: string) {
+    const rekeningFilter = rekeningId ? { rekening_id: rekeningId } : {};
+    const [roAgg, danaList] = await Promise.all([
+      this.prisma.ro.aggregate({
+        _sum: { total_plafon: true },
+        where: {
+          tahun_fiscal: tahunFiscal,
+          status_ro: 'AKTIF',
+          ...rekeningFilter,
+        },
+      }),
+      this.prisma.danaOperasional.findMany({
+        where: { tahun_fiscal: tahunFiscal, ...rekeningFilter },
+        select: {
+          id: true,
+          total_plafon: true,
+          transaksi_list: {
+            select: { debit: true, kredit: true },
+          },
+        },
+      }),
+    ]);
+
+    const saldo_ro = roAgg._sum.total_plafon ?? 0;
+    const saldo_dana_operasional = danaList.reduce((total, dana) => {
+      const mutasi_neto = dana.transaksi_list.reduce(
+        (sum, transaksi) => sum + transaksi.debit - transaksi.kredit,
+        0,
+      );
+      return total + dana.total_plafon - Math.max(0, mutasi_neto);
+    }, 0);
+
+    return {
+      tahun_fiscal: tahunFiscal,
+      rekening_id: rekeningId ?? null,
+      saldo_ro,
+      saldo_dana_operasional,
+      total_saldo_sistem: saldo_ro + saldo_dana_operasional,
+    };
+  }
 }
