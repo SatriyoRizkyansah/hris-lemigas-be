@@ -85,6 +85,12 @@ export class DanaOperasionalItemDto {
   @ApiPropertyOptional({ nullable: true })
   nama_unit_koordinator?: string | null;
 
+  @ApiPropertyOptional({ nullable: true })
+  id_rekening?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  rekening_id?: string | null;
+
   @ApiPropertyOptional({ enum: KategoriKamar })
   kategori_kamar?: KategoriKamar;
 

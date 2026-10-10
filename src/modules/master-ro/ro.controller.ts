@@ -168,6 +168,105 @@ export class RoController {
     });
   }
 
+  @Post(':id/silpa')
+  @ApiRoles('Bawa saldo RO ke tahun fiskal berikutnya sebagai SILPA proyek', [
+    Role.Superadmin,
+  ])
+  async carryoverSilpa(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const source = await tx.ro.findUnique({ where: { id } });
+      if (!source) throw new NotFoundException('RO tidak ditemukan');
+      if (source.status_ro !== 'AKTIF') {
+        throw new BadRequestException(
+          'Hanya RO aktif yang dapat ditutup dan dibawa sebagai SILPA',
+        );
+      }
+      if (source.parent_ro_id) {
+        throw new BadRequestException('RO ini sudah merupakan RO carryover');
+      }
+      const existingChild = await tx.ro.findFirst({
+        where: { parent_ro_id: id },
+      });
+      if (existingChild) {
+        throw new ConflictException('SILPA RO ini sudah pernah dibuat');
+      }
+      const saldo = source.total_plafon;
+      if (saldo <= 0) {
+        throw new BadRequestException(
+          'RO tidak memiliki sisa saldo untuk dibawa sebagai SILPA',
+        );
+      }
+      const nextYear = source.tahun_fiscal + 1;
+      const kode = `${source.kode_ro}-S${nextYear}`.slice(0, 50);
+      const duplicateCode = await tx.ro.findUnique({
+        where: { kode_ro: kode },
+      });
+      if (duplicateCode) {
+        throw new ConflictException(
+          `Kode RO carryover ${kode} sudah terdaftar`,
+        );
+      }
+      const child = await tx.ro.create({
+        data: {
+          kode_ro: kode,
+          nama_ro: `${source.nama_ro} — SILPA ${nextYear}`.slice(0, 200),
+          proyek_id: source.proyek_id,
+          unit_koordinator_id: source.unit_koordinator_id,
+          rekening_id: source.rekening_id,
+          tahun_fiscal: nextYear,
+          total_plafon: saldo,
+          no_kontrak: source.no_kontrak,
+          pj: source.pj,
+          no_sk: source.no_sk,
+          mulai_sk: source.mulai_sk,
+          berakhir_sk: source.berakhir_sk,
+          status_ro: 'AKTIF',
+          parent_ro_id: source.id,
+        },
+      });
+      const closed = await tx.ro.update({
+        where: { id: source.id },
+        data: { status_ro: 'SELESAI' },
+      });
+      return { source: closed, child };
+    });
+
+    await this.audit.log({
+      tabel: 'ro',
+      recordId: result.child.id,
+      aksi: AksiAudit.CREATE,
+      dilakukanOleh: user.sub,
+      dataSesudah: {
+        ...result.child,
+        tipe: 'SILPA_CARRYOVER',
+        ro_asal_id: result.source.id,
+      },
+    });
+    await this.audit.log({
+      tabel: 'ro',
+      recordId: result.source.id,
+      aksi: AksiAudit.UPDATE,
+      dilakukanOleh: user.sub,
+      dataSesudah: {
+        ...result.source,
+        tipe: 'PENUTUPAN_RO_SILPA',
+        ro_baru_id: result.child.id,
+      },
+    });
+
+    return created(
+      'Saldo RO berhasil dibawa sebagai SILPA pada proyek yang sama',
+      {
+        ro_asal_id: result.source.id,
+        ro_baru: result.child,
+        dana_operasional_dibuat: false,
+      },
+    );
+  }
+
   @Get(':id/ledger')
   @ApiRoles('Get ledger RO', [Role.Superadmin, Role.Koordinator, Role.Keuangan])
   @ApiStandartResponse()
@@ -247,6 +346,16 @@ export class RoController {
       where: { id: body.id_proyek },
     });
     if (!proyek) throw new BadRequestException('Proyek tidak ditemukan');
+
+    if (body.id_rekening) {
+      const rekening = await this.prisma.masterRekening.findUnique({
+        where: { id: body.id_rekening },
+      });
+      if (!rekening || rekening.status_aktif !== 'AKTIF')
+        throw new BadRequestException(
+          'Rekening bank RO tidak ditemukan atau tidak aktif',
+        );
+    }
 
     const unit = await this.prisma.unitKerja.findUnique({
       where: { id: body.id_unit_koordinator },
@@ -332,6 +441,16 @@ export class RoController {
       );
       if (!inScope)
         throw new BadRequestException('Anda tidak memiliki akses ke RO ini');
+    }
+
+    if (body.id_rekening) {
+      const rekening = await this.prisma.masterRekening.findUnique({
+        where: { id: body.id_rekening },
+      });
+      if (!rekening || rekening.status_aktif !== 'AKTIF')
+        throw new BadRequestException(
+          'Rekening bank RO tidak ditemukan atau tidak aktif',
+        );
     }
 
     // Validasi plafon baru tidak kurang dari yang sudah terpakai
@@ -461,6 +580,10 @@ export class RoController {
       nama_proyek: ro.proyek?.nama_proyek ?? null,
       id_unit_koordinator: ro.unit_koordinator?.id ?? null,
       nama_unit_koordinator: ro.unit_koordinator?.nama_unit ?? null,
+      id_rekening: ro.rekening_id ?? null,
+      rekening_id: ro.rekening_id ?? null,
+      parent_ro_id: ro.parent_ro_id ?? null,
+      ro_asal_id: ro.parent_ro_id ?? null,
       no_kontrak: ro.no_kontrak ?? null,
       pj: ro.pj ?? null,
       file_rab: ro.file_rab ?? null,

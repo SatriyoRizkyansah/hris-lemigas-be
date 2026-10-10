@@ -32,6 +32,14 @@ export class PengaturanMarginItemDto {
   nama_unit?: string;
   @ApiPropertyOptional()
   kode_unit?: string;
+  @ApiPropertyOptional()
+  rekening_id?: string | null;
+  @ApiPropertyOptional()
+  nama_rekening?: string | null;
+  @ApiPropertyOptional()
+  nama_bank?: string | null;
+  @ApiPropertyOptional()
+  nomor_rekening?: string | null;
 }
 
 export class UpdatePengaturanMarginDto {
@@ -51,4 +59,11 @@ export class UpdatePengaturanMarginDto {
   @IsUUID()
   @IsOptional()
   unit_kerja_id?: string;
+
+  @ApiPropertyOptional({
+    description: 'Master rekening tujuan distribusi margin',
+  })
+  @IsUUID()
+  @IsOptional()
+  rekening_id?: string;
 }

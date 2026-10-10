@@ -172,6 +172,7 @@ export class ProyekController {
           nama_ro: string;
           kode_ro?: string;
           id_unit_koordinator: string;
+          rekening_id?: string;
           plafon: number;
         }>
       | undefined;
@@ -246,6 +247,7 @@ export class ProyekController {
               nama_ro: r.nama_ro,
               proyek_id: created.id,
               unit_koordinator_id: r.id_unit_koordinator,
+              rekening_id: r.rekening_id ?? null,
               tahun_fiscal: body.tahun_fiscal,
               total_plafon: r.plafon,
             } as any,

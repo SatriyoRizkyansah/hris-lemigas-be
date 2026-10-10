@@ -234,9 +234,10 @@ model MasterRekening {
   created_at      DateTime    @default(now())
   updated_at      DateTime    @updatedAt
 
-  ro_list            Ro[]
-  dana_operasional_list DanaOperasional[]
-  rekonsiliasi_list   RekonsiliasiBank[]
+  ro_list                 Ro[]
+  dana_operasional_list   DanaOperasional[]
+  pengaturan_margin_list  PengaturanMargin[]
+  rekonsiliasi_list        RekonsiliasiBank[]
 
   @@index([status_aktif])
   @@map("master_rekening")
@@ -291,11 +292,14 @@ model PengaturanMargin {
   nama_kamar    String       @db.VarChar(150)
   persentase    Float
   unit_kerja_id String       @db.Uuid
+  rekening_id   String?      @db.Uuid
   updated_at    DateTime     @updatedAt
 
-  unit_kerja UnitKerja @relation(fields: [unit_kerja_id], references: [id])
+  unit_kerja UnitKerja        @relation(fields: [unit_kerja_id], references: [id])
+  rekening   MasterRekening?  @relation(fields: [rekening_id], references: [id])
 
   @@index([unit_kerja_id])
+  @@index([rekening_id])
   @@map("pengaturan_margin")
 }
 
@@ -316,17 +320,21 @@ model Ro {
   no_sk               String?  @db.VarChar(100)
   mulai_sk            DateTime? @db.Date
   berakhir_sk         DateTime? @db.Date
+  parent_ro_id       String?  @db.Uuid
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
 
   proyek           Proyek          @relation(fields: [proyek_id], references: [id])
   unit_koordinator UnitKerja       @relation(fields: [unit_koordinator_id], references: [id])
   rekening         MasterRekening? @relation(fields: [rekening_id], references: [id])
+  parent_ro        Ro?             @relation("RoCarryover", fields: [parent_ro_id], references: [id])
+  child_ro         Ro?             @relation("RoCarryover")
 
   alokasi_list   AlokasiGajiTA[]
   transaksi_list RoTransaksi[]
   sk_default_list Sk[] @relation("SkRoDefault")
 
+  @@unique([parent_ro_id])
   @@index([proyek_id])
   @@index([unit_koordinator_id])
   @@index([tahun_fiscal])

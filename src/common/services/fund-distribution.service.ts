@@ -38,6 +38,29 @@ export class FundDistributionService {
           `Total persentase pengaturan margin harus 100% (saat ini ${totalPct}%)`,
         );
       }
+      const configsWithoutAccount = configs.filter(
+        (config) => !config.rekening_id,
+      );
+      if (configsWithoutAccount.length > 0) {
+        throw new BadRequestException(
+          `Master rekening belum dipilih untuk kategori: ${configsWithoutAccount.map((config) => config.nama_kamar).join(', ')}`,
+        );
+      }
+      const activeAccounts = await tx.masterRekening.findMany({
+        where: {
+          id: { in: configs.map((config) => config.rekening_id as string) },
+          status_aktif: 'AKTIF',
+        },
+        select: { id: true },
+      });
+      if (
+        activeAccounts.length !==
+        new Set(configs.map((config) => config.rekening_id)).size
+      ) {
+        throw new BadRequestException(
+          'Satu atau lebih Master Rekening margin tidak aktif atau tidak ditemukan',
+        );
+      }
 
       // Calculate portions rounded, adjust diff to biggest percentage
       const portions = new Map<string, number>();
@@ -50,7 +73,9 @@ export class FundDistributionService {
       }
       const diff = totalMargin - allocated;
       if (diff !== 0) {
-        const biggest = [...configs].sort((a, b) => b.persentase - a.persentase)[0];
+        const biggest = [...configs].sort(
+          (a, b) => b.persentase - a.persentase,
+        )[0];
         portions.set(
           biggest.kategori_kamar,
           (portions.get(biggest.kategori_kamar) ?? 0) + diff,
@@ -69,14 +94,23 @@ export class FundDistributionService {
           },
         });
         if (wallet) {
+          if (wallet.rekening_id && wallet.rekening_id !== cfg.rekening_id) {
+            throw new BadRequestException(
+              `Wallet ${cfg.nama_kamar} sudah terhubung ke rekening lain. Samakan rekening wallet dan pengaturan margin sebelum distribusi.`,
+            );
+          }
           wallet = await tx.danaOperasional.update({
             where: { id: wallet.id },
-            data: { total_plafon: { increment: amount } },
+            data: {
+              rekening_id: cfg.rekening_id,
+              total_plafon: { increment: amount },
+            },
           });
         } else {
           wallet = await tx.danaOperasional.create({
             data: {
               unit_koordinator_id: cfg.unit_kerja_id,
+              rekening_id: cfg.rekening_id,
               tahun_fiscal: tahunFiscal,
               kategori_kamar: cfg.kategori_kamar as any,
               total_plafon: amount,
@@ -151,14 +185,37 @@ export class FundDistributionService {
         const unitId = mappingKoordinatorId[kategori];
         if (!unitId) continue;
         let wallet = await tx.danaOperasional.findFirst({
-          where: { unit_koordinator_id: unitId, tahun_fiscal: tahunFiscal, kategori_kamar: kategori as any },
+          where: {
+            unit_koordinator_id: unitId,
+            tahun_fiscal: tahunFiscal,
+            kategori_kamar: kategori as any,
+          },
         });
         if (wallet) {
-          wallet = await tx.danaOperasional.update({ where: { id: wallet.id }, data: { total_plafon: { increment: amount } } });
+          wallet = await tx.danaOperasional.update({
+            where: { id: wallet.id },
+            data: { total_plafon: { increment: amount } },
+          });
         } else {
-          wallet = await tx.danaOperasional.create({ data: { unit_koordinator_id: unitId, tahun_fiscal: tahunFiscal, kategori_kamar: kategori as any, total_plafon: amount } });
+          wallet = await tx.danaOperasional.create({
+            data: {
+              unit_koordinator_id: unitId,
+              tahun_fiscal: tahunFiscal,
+              kategori_kamar: kategori as any,
+              total_plafon: amount,
+            },
+          });
         }
-        await tx.danaTransaksi.create({ data: { dana_id: wallet.id, nama_kegiatan: 'Distribusi Margin Otomatis', debit: amount, kredit: 0, tanggal: new Date(), keterangan: `Margin ${totalMargin} dibagi ${kategori} (${pct}%)` } });
+        await tx.danaTransaksi.create({
+          data: {
+            dana_id: wallet.id,
+            nama_kegiatan: 'Distribusi Margin Otomatis',
+            debit: amount,
+            kredit: 0,
+            tanggal: new Date(),
+            keterangan: `Margin ${totalMargin} dibagi ${kategori} (${pct}%)`,
+          },
+        });
       }
     });
   }

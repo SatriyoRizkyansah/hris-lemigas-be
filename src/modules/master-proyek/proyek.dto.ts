@@ -38,6 +38,11 @@ export class RoInputDto {
   @IsInt()
   @Min(1)
   plafon: number;
+
+  @ApiPropertyOptional()
+  @IsUUID()
+  @IsOptional()
+  rekening_id?: string;
 }
 
 export class ProyekQueryDto extends PaginateQuery {

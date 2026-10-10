@@ -253,6 +253,16 @@ export class DanaOperasionalController {
       );
     }
 
+    if (body.id_rekening) {
+      const rekening = await this.prisma.masterRekening.findUnique({
+        where: { id: body.id_rekening },
+      });
+      if (!rekening || rekening.status_aktif !== 'AKTIF')
+        throw new BadRequestException(
+          'Rekening bank dana operasional tidak ditemukan atau tidak aktif',
+        );
+    }
+
     const kategori = (body as any).kategori_kamar ?? 'LAINNYA';
     const exists = await this.prisma.danaOperasional.findUnique({
       where: {
@@ -312,6 +322,16 @@ export class DanaOperasionalController {
     });
     if (!existing)
       throw new NotFoundException('Dana operasional tidak ditemukan');
+
+    if (body.id_rekening) {
+      const rekening = await this.prisma.masterRekening.findUnique({
+        where: { id: body.id_rekening },
+      });
+      if (!rekening || rekening.status_aktif !== 'AKTIF')
+        throw new BadRequestException(
+          'Rekening bank dana operasional tidak ditemukan atau tidak aktif',
+        );
+    }
 
     if (body.total_plafon !== undefined) {
       const balance = await this.fund.getOperationalBalance(id);
@@ -399,6 +419,8 @@ export class DanaOperasionalController {
       sisa_saldo: balance.sisa_saldo ?? item.total_plafon,
       id_unit_koordinator: item.unit_koordinator?.id ?? null,
       nama_unit_koordinator: item.unit_koordinator?.nama_unit ?? null,
+      id_rekening: item.rekening_id ?? null,
+      rekening_id: item.rekening_id ?? null,
       kategori_kamar: item.kategori_kamar ?? 'LAINNYA',
       created_at: item.created_at,
       updated_at: item.updated_at,

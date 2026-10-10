@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -32,6 +33,15 @@ export class PengaturanMarginController {
     const items = await this.prisma.pengaturanMargin.findMany({
       include: {
         unit_kerja: { select: { id: true, kode_unit: true, nama_unit: true } },
+        rekening: {
+          select: {
+            id: true,
+            nama_bank: true,
+            nama_rekening: true,
+            nomor_rekening: true,
+            status_aktif: true,
+          },
+        },
       },
       orderBy: { kategori_kamar: 'asc' },
     });
@@ -41,8 +51,12 @@ export class PengaturanMarginController {
       nama_kamar: i.nama_kamar,
       persentase: i.persentase,
       unit_kerja_id: i.unit_kerja_id,
-      nama_unit: (i as any).unit_kerja?.nama_unit ?? null,
-      kode_unit: (i as any).unit_kerja?.kode_unit ?? null,
+      nama_unit: i.unit_kerja?.nama_unit ?? null,
+      kode_unit: i.unit_kerja?.kode_unit ?? null,
+      rekening_id: i.rekening_id,
+      nama_rekening: i.rekening?.nama_rekening ?? null,
+      nama_bank: i.rekening?.nama_bank ?? null,
+      nomor_rekening: i.rekening?.nomor_rekening ?? null,
     }));
     const total = data.reduce((s, x) => s + x.persentase, 0);
     return ok('Berhasil mengambil pengaturan margin', {
@@ -60,16 +74,67 @@ export class PengaturanMarginController {
     const existing = await this.prisma.pengaturanMargin.findUnique({
       where: { id },
     });
-    if (!existing) throw new Error('Pengaturan margin tidak ditemukan');
-    const updated = await this.prisma.pengaturanMargin.update({
-      where: { id },
-      data: {
-        ...(body.nama_kamar !== undefined && { nama_kamar: body.nama_kamar }),
-        ...(body.persentase !== undefined && { persentase: body.persentase }),
-        ...(body.unit_kerja_id !== undefined && {
-          unit_kerja_id: body.unit_kerja_id,
-        }),
-      },
+    if (!existing)
+      throw new BadRequestException('Pengaturan margin tidak ditemukan');
+    if (body.rekening_id !== undefined) {
+      const rekening = await this.prisma.masterRekening.findUnique({
+        where: { id: body.rekening_id },
+        select: { id: true, status_aktif: true },
+      });
+      if (!rekening || rekening.status_aktif !== 'AKTIF') {
+        throw new BadRequestException(
+          'Rekening harus terdaftar dan berstatus aktif',
+        );
+      }
+      const wallets = await this.prisma.danaOperasional.findMany({
+        where: {
+          unit_koordinator_id: body.unit_kerja_id ?? existing.unit_kerja_id,
+          kategori_kamar: existing.kategori_kamar,
+          rekening_id: { not: null },
+        },
+        select: { rekening_id: true },
+      });
+      if (wallets.some((wallet) => wallet.rekening_id !== body.rekening_id)) {
+        throw new BadRequestException(
+          'Wallet kategori/unit ini sudah terhubung ke rekening berbeda. Samakan rekening wallet terlebih dahulu agar saldo tidak salah direkonsiliasi.',
+        );
+      }
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.pengaturanMargin.update({
+        where: { id },
+        data: {
+          ...(body.nama_kamar !== undefined && { nama_kamar: body.nama_kamar }),
+          ...(body.persentase !== undefined && { persentase: body.persentase }),
+          ...(body.unit_kerja_id !== undefined && {
+            unit_kerja_id: body.unit_kerja_id,
+          }),
+          ...(body.rekening_id !== undefined && {
+            rekening_id: body.rekening_id,
+          }),
+        },
+        include: {
+          rekening: {
+            select: {
+              id: true,
+              nama_bank: true,
+              nama_rekening: true,
+              nomor_rekening: true,
+            },
+          },
+        },
+      });
+      if (body.rekening_id !== undefined) {
+        await tx.danaOperasional.updateMany({
+          where: {
+            unit_koordinator_id: body.unit_kerja_id ?? existing.unit_kerja_id,
+            kategori_kamar: existing.kategori_kamar,
+            rekening_id: null,
+          },
+          data: { rekening_id: body.rekening_id },
+        });
+      }
+      return result;
     });
     return ok('Berhasil mengupdate pengaturan margin', updated);
   }

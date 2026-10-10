@@ -203,6 +203,18 @@ export class RoItemDto {
   nama_unit_koordinator?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
+  id_rekening?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  rekening_id?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  parent_ro_id?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  ro_asal_id?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
   no_kontrak?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
